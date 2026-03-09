@@ -81,3 +81,50 @@ body {
 .glow-primary {
   box-shadow: 0 0 20px oklch(0.55 0.15 210 / 0.3);
 }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 12px oklch(0.75 0.18 145 / 0.2); }
+  50% { box-shadow: 0 0 24px oklch(0.75 0.18 145 / 0.45); }
+}
+
+.glow-running {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.03 240);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.03 240);
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.35 0.03 240) transparent;
+}
+
+/* Blinking cursor for terminal input */
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+#terminal-input {
+  caret-color: oklch(0.55 0.15 210);
+}
+
+#terminal-input::placeholder {
+  color: oklch(0.40 0.03 240);
+}

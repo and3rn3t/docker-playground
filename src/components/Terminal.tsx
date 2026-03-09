@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Terminal as TerminalIcon } from '@phosphor-icons/react'
@@ -8,6 +8,43 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface TerminalProps {
   lines: TerminalLine[]
   onCommand: (command: string) => void
+}
+
+const DOCKER_SUBCOMMANDS = new Set([
+  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
+  'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
+  'history', 'system', 'prune'
+])
+
+function highlightCommand(text: string): React.ReactNode {
+  const parts = text.split(/(\s+)/)
+  const nodes: React.ReactNode[] = []
+  let pastDocker = false
+  let pastSubcommand = false
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (/^\s+$/.test(part)) {
+      nodes.push(part)
+      continue
+    }
+
+    if (part === 'docker' && !pastDocker) {
+      nodes.push(<span key={i} className="text-primary font-semibold">{part}</span>)
+      pastDocker = true
+    } else if (pastDocker && !pastSubcommand && DOCKER_SUBCOMMANDS.has(part)) {
+      nodes.push(<span key={i} className="text-accent">{part}</span>)
+      pastSubcommand = true
+    } else if (part.startsWith('-')) {
+      nodes.push(<span key={i} className="text-secondary">{part}</span>)
+    } else if (pastDocker) {
+      nodes.push(<span key={i} className="text-foreground/90">{part}</span>)
+    } else {
+      nodes.push(<span key={i} className="text-primary">{part}</span>)
+    }
+  }
+
+  return <>{nodes}</>
 }
 
 export function Terminal({ lines, onCommand }: TerminalProps) {
@@ -57,6 +94,8 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
     }
   }
 
+  const highlightedInput = useMemo(() => highlightCommand(input), [input])
+
   return (
     <div className="flex flex-col h-full bg-card border border-border rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b border-border">
@@ -76,7 +115,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
                 transition={{ duration: 0.15 }}
                 className={
                   line.type === 'command'
-                    ? 'text-primary flex items-start gap-2'
+                    ? 'flex items-start gap-2'
                     : line.type === 'error'
                     ? 'text-destructive pl-4'
                     : line.type === 'success'
@@ -84,8 +123,10 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
                     : 'text-foreground/80 pl-4 whitespace-pre-wrap'
                 }
               >
-                {line.type === 'command' && <span className="text-muted-foreground">$</span>}
-                <span className="flex-1">{line.content}</span>
+                {line.type === 'command' && <span className="text-muted-foreground select-none">$</span>}
+                <span className="flex-1">
+                  {line.type === 'command' ? highlightCommand(line.content) : line.content}
+                </span>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -93,19 +134,27 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
       </ScrollArea>
 
       <form onSubmit={handleSubmit} className="border-t border-border p-3 bg-muted/30">
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground font-mono text-sm">$</span>
-          <Input
-            ref={inputRef}
-            id="terminal-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="docker ps"
-            className="font-mono text-sm bg-background/50 border-input focus-visible:ring-primary"
-            autoComplete="off"
-            autoFocus
-          />
+        <div className="flex items-center gap-2 relative">
+          <span className="text-muted-foreground font-mono text-sm select-none">$</span>
+          <div className="relative flex-1">
+            <div
+              aria-hidden
+              className="absolute inset-0 flex items-center font-mono text-sm px-3 pointer-events-none whitespace-pre"
+            >
+              {input ? highlightedInput : null}
+            </div>
+            <Input
+              ref={inputRef}
+              id="terminal-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="docker ps"
+              className="font-mono text-sm bg-background/50 border-input focus-visible:ring-primary text-transparent caret-foreground"
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
         </div>
       </form>
     </div>

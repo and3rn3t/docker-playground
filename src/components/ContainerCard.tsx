@@ -20,13 +20,13 @@ export function ContainerCard({ container, onStop, onStart, onRemove }: Containe
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9, y: -10 }}
       transition={{ duration: 0.3, type: 'spring', bounce: 0.2 }}
     >
       <Card
-        className={`p-4 border-2 transition-all ${isRunning || isPaused ? 'border-accent/50 glow-accent' : 'border-border'}`}
+        className={`p-4 border-2 transition-all ${isRunning ? 'border-accent/50 glow-running' : isPaused ? 'border-yellow-600/50 glow-accent' : 'border-border'}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">

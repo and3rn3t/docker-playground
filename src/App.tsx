@@ -306,15 +306,15 @@ function App() {
       
       <div className="relative">
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
+          <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">Docker Playground</h1>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Docker Playground</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
                   Learn Docker commands in an interactive sandbox
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 <div className="flex items-center gap-2 text-sm">
                   <Cube weight="duotone" className="text-accent" />
                   <span className="font-mono">
@@ -325,7 +325,7 @@ function App() {
                 <TutorialProgressTracker tutorialProgresses={tutorialProgressesMap} />
                 <Button onClick={() => setAchievementsOpen(true)} variant="secondary" size="sm">
                   <Sparkle weight="bold" />
-                  <span>Achievements</span>
+                  <span className="hidden sm:inline">Achievements</span>
                   {(unlockedAchievements || []).length > 0 && (
                     <span className="ml-1 px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground text-xs font-mono">
                       {(unlockedAchievements || []).length}
@@ -334,19 +334,19 @@ function App() {
                 </Button>
                 <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary">
                   <GraduationCap weight="bold" />
-                  <span>Tutorials</span>
+                  <span className="hidden sm:inline">Tutorials</span>
                 </Button>
                 <Button onClick={() => setHelpOpen(true)} variant="outline" size="sm">
                   <Question weight="bold" />
-                  <span>Help</span>
+                  <span className="hidden sm:inline">Help</span>
                 </Button>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="container mx-auto px-6 py-6">
-          <div className="grid lg:grid-cols-2 gap-6">
+        <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-4">
               <AnimatePresence>
                 {quickStartVisible && (
@@ -409,7 +409,7 @@ function App() {
                   onExit={handleExitTutorial}
                 />
               )}
-              <div className="h-[600px]">
+              <div className="h-[400px] sm:h-[500px] lg:h-[600px]">
                 <Terminal lines={terminalLines} onCommand={handleCommand} />
               </div>
             </div>
@@ -437,7 +437,7 @@ function App() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="containers" className="space-y-3 h-[540px] overflow-y-auto pr-2">
+                <TabsContent value="containers" className="space-y-3 h-[400px] sm:h-[480px] lg:h-[540px] overflow-y-auto pr-2 custom-scrollbar">
                   {currentContainers.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-8">
                       <Cube weight="duotone" className="text-muted-foreground text-6xl mb-4" />
@@ -464,7 +464,7 @@ function App() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="images" className="space-y-3 h-[540px] overflow-y-auto pr-2">
+                <TabsContent value="images" className="space-y-3 h-[400px] sm:h-[480px] lg:h-[540px] overflow-y-auto pr-2 custom-scrollbar">
                   {currentImages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-8">
                       <StackIcon weight="duotone" className="text-muted-foreground text-6xl mb-4" />
