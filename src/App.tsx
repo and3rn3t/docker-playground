@@ -1,20 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Terminal } from '@/components/Terminal'
 import { ContainerCard } from '@/components/ContainerCard'
 import { ImageCard } from '@/components/ImageCard'
 import { HelpDialog } from '@/components/HelpDialog'
+import { TutorialsDialog } from '@/components/TutorialsDialog'
+import { TutorialPanel } from '@/components/TutorialPanel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Question, Cube, Stack as StackIcon } from '@phosphor-icons/react'
-import { DockerContainer, DockerImage, TerminalLine } from '@/lib/types'
+import { Question, Cube, Stack as StackIcon, GraduationCap } from '@phosphor-icons/react'
+import { DockerContainer, DockerImage, TerminalLine, TutorialProgress } from '@/lib/types'
 import { parseCommand, getInitialImages } from '@/lib/docker-parser'
+import { getTutorialById, checkCommandMatch } from '@/lib/tutorials'
 import { toast, Toaster } from 'sonner'
 import { AnimatePresence } from 'framer-motion'
 
 function App() {
   const [containers, setContainers] = useKV<DockerContainer[]>('docker-containers', [])
   const [images, setImages] = useKV<DockerImage[]>('docker-images', getInitialImages())
+  const [tutorialProgresses, setTutorialProgresses] = useKV<Record<string, TutorialProgress>>('tutorial-progresses', {})
+  const [activeTutorialId, setActiveTutorialId] = useKV<string | null>('active-tutorial', null)
+  
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([
     {
       id: '0',
@@ -24,9 +30,24 @@ function App() {
     }
   ])
   const [helpOpen, setHelpOpen] = useState(false)
+  const [tutorialsOpen, setTutorialsOpen] = useState(false)
 
   const currentContainers = containers || []
   const currentImages = images || []
+  const activeTutorial = activeTutorialId ? getTutorialById(activeTutorialId) : null
+  const activeTutorialProgress = activeTutorialId ? tutorialProgresses?.[activeTutorialId] : null
+
+  useEffect(() => {
+    if (activeTutorialProgress && activeTutorial) {
+      const currentStep = activeTutorial.steps[activeTutorialProgress.currentStepIndex]
+      if (currentStep.validation) {
+        const isValid = currentStep.validation({ containers: currentContainers, images: currentImages })
+        if (isValid && !activeTutorialProgress.completedSteps.includes(currentStep.id)) {
+          handleStepComplete()
+        }
+      }
+    }
+  }, [currentContainers, currentImages])
 
   const addTerminalLine = (line: Omit<TerminalLine, 'id' | 'timestamp'>) => {
     setTerminalLines(prev => [...prev, {
@@ -36,32 +57,178 @@ function App() {
     }])
   }
 
+  const handleStepComplete = () => {
+    if (!activeTutorialId || !activeTutorial || !activeTutorialProgress) return
+
+    const currentStep = activeTutorial.steps[activeTutorialProgress.currentStepIndex]
+    const newCompletedSteps = [...activeTutorialProgress.completedSteps, currentStep.id]
+    const nextStepIndex = activeTutorialProgress.currentStepIndex + 1
+
+    addTerminalLine({ type: 'success', content: `✓ ${currentStep.successMessage}` })
+    toast.success('Step completed!', { description: currentStep.successMessage })
+
+    if (nextStepIndex >= activeTutorial.steps.length) {
+      setTutorialProgresses(current => ({
+        ...current,
+        [activeTutorialId]: {
+          ...activeTutorialProgress,
+          completedSteps: newCompletedSteps,
+          currentStepIndex: nextStepIndex - 1,
+          completed: true,
+          completedAt: Date.now()
+        }
+      }))
+      setActiveTutorialId(null)
+      toast.success('🎉 Tutorial completed!', { 
+        description: `You've mastered: ${activeTutorial.title}` 
+      })
+      addTerminalLine({ 
+        type: 'success', 
+        content: `🎉 Tutorial "${activeTutorial.title}" completed! You've learned all the steps.` 
+      })
+    } else {
+      setTutorialProgresses(current => ({
+        ...current,
+        [activeTutorialId]: {
+          ...activeTutorialProgress,
+          completedSteps: newCompletedSteps,
+          currentStepIndex: nextStepIndex
+        }
+      }))
+    }
+  }
+
   const handleCommand = (command: string) => {
     addTerminalLine({ type: 'command', content: command })
 
-    const result = parseCommand(
-      command,
-      { containers: currentContainers, images: currentImages },
-      (newState) => {
-        setContainers(newState.containers)
-        setImages(newState.images)
-      }
-    )
+    if (activeTutorial && activeTutorialProgress) {
+      const currentStep = activeTutorial.steps[activeTutorialProgress.currentStepIndex]
+      const isCorrectCommand = checkCommandMatch(currentStep.expectedCommand, command)
 
-    if (result.output === 'CLEAR_TERMINAL') {
-      setTerminalLines([])
-      return
-    }
+      if (isCorrectCommand) {
+        const result = parseCommand(
+          command,
+          { containers: currentContainers, images: currentImages },
+          (newState) => {
+            setContainers(newState.containers)
+            setImages(newState.images)
+          }
+        )
 
-    if (result.success) {
-      if (result.output) {
-        addTerminalLine({ type: 'output', content: result.output })
+        if (result.output === 'CLEAR_TERMINAL') {
+          setTerminalLines([])
+          return
+        }
+
+        if (result.success) {
+          if (result.output) {
+            addTerminalLine({ type: 'output', content: result.output })
+          }
+          
+          if (!currentStep.validation) {
+            handleStepComplete()
+          }
+        } else {
+          if (result.error) {
+            addTerminalLine({ type: 'error', content: result.error })
+          }
+        }
+      } else {
+        const result = parseCommand(
+          command,
+          { containers: currentContainers, images: currentImages },
+          (newState) => {
+            setContainers(newState.containers)
+            setImages(newState.images)
+          }
+        )
+
+        if (result.output === 'CLEAR_TERMINAL') {
+          setTerminalLines([])
+          return
+        }
+
+        if (result.success) {
+          if (result.output) {
+            addTerminalLine({ type: 'output', content: result.output })
+          }
+          addTerminalLine({ 
+            type: 'error', 
+            content: '⚠️  This command works, but it\'s not what the tutorial expects. Try following the tutorial step.' 
+          })
+        } else {
+          if (result.error) {
+            addTerminalLine({ type: 'error', content: result.error })
+          }
+        }
       }
     } else {
-      if (result.error) {
-        addTerminalLine({ type: 'error', content: result.error })
+      const result = parseCommand(
+        command,
+        { containers: currentContainers, images: currentImages },
+        (newState) => {
+          setContainers(newState.containers)
+          setImages(newState.images)
+        }
+      )
+
+      if (result.output === 'CLEAR_TERMINAL') {
+        setTerminalLines([])
+        return
+      }
+
+      if (result.success) {
+        if (result.output) {
+          addTerminalLine({ type: 'output', content: result.output })
+        }
+      } else {
+        if (result.error) {
+          addTerminalLine({ type: 'error', content: result.error })
+        }
       }
     }
+  }
+
+  const handleStartTutorial = (tutorialId: string) => {
+    const tutorial = getTutorialById(tutorialId)
+    if (!tutorial) return
+
+    const existingProgress = tutorialProgresses?.[tutorialId]
+    
+    if (existingProgress && !existingProgress.completed) {
+      setActiveTutorialId(tutorialId)
+      addTerminalLine({ 
+        type: 'success', 
+        content: `📚 Resuming tutorial: ${tutorial.title}` 
+      })
+    } else {
+      setTutorialProgresses(current => ({
+        ...current,
+        [tutorialId]: {
+          tutorialId,
+          currentStepIndex: 0,
+          completedSteps: [],
+          completed: false,
+          startedAt: Date.now()
+        }
+      }))
+      setActiveTutorialId(tutorialId)
+      addTerminalLine({ 
+        type: 'success', 
+        content: `📚 Started tutorial: ${tutorial.title}` 
+      })
+      toast.success('Tutorial started!', { description: tutorial.title })
+    }
+  }
+
+  const handleExitTutorial = () => {
+    if (activeTutorial) {
+      addTerminalLine({ 
+        type: 'output', 
+        content: `Tutorial "${activeTutorial.title}" paused. Your progress is saved.` 
+      })
+    }
+    setActiveTutorialId(null)
   }
 
   const handleStopContainer = (containerId: string) => {
@@ -116,6 +283,7 @@ function App() {
   }
 
   const runningCount = currentContainers.filter(c => c.status === 'running').length
+  const tutorialProgressesMap = new Map(Object.entries(tutorialProgresses || {}))
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -139,6 +307,10 @@ function App() {
                     <span className="text-muted-foreground"> / {currentContainers.length} running</span>
                   </span>
                 </div>
+                <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary">
+                  <GraduationCap weight="bold" />
+                  <span>Tutorials</span>
+                </Button>
                 <Button onClick={() => setHelpOpen(true)} variant="outline" size="sm">
                   <Question weight="bold" />
                   <span>Help</span>
@@ -150,8 +322,18 @@ function App() {
 
         <main className="container mx-auto px-6 py-6">
           <div className="grid lg:grid-cols-2 gap-6">
-            <div className="h-[600px]">
-              <Terminal lines={terminalLines} onCommand={handleCommand} />
+            <div className="space-y-4">
+              {activeTutorial && activeTutorialProgress && (
+                <TutorialPanel
+                  tutorial={activeTutorial}
+                  currentStepIndex={activeTutorialProgress.currentStepIndex}
+                  completedSteps={activeTutorialProgress.completedSteps}
+                  onExit={handleExitTutorial}
+                />
+              )}
+              <div className="h-[600px]">
+                <Terminal lines={terminalLines} onCommand={handleCommand} />
+              </div>
             </div>
 
             <div>
@@ -235,6 +417,12 @@ function App() {
       </div>
 
       <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      <TutorialsDialog 
+        open={tutorialsOpen} 
+        onOpenChange={setTutorialsOpen}
+        onStartTutorial={handleStartTutorial}
+        tutorialProgresses={tutorialProgressesMap}
+      />
       <Toaster theme="dark" position="bottom-right" />
     </div>
   )

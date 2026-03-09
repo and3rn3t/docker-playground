@@ -19,6 +19,13 @@ An interactive Docker playground that simulates Docker concepts and commands to 
 - Progression: User types command → Parser validates syntax → System executes simulated command → Visual feedback shows state changes → Output displays in terminal
 - Success criteria: Commands parse correctly, state updates appropriately, and clear feedback is provided for both valid and invalid commands
 
+**Interactive Tutorial System**
+- Functionality: Step-by-step guided tutorials teaching Docker workflows with validation and hints
+- Purpose: Provides structured learning paths for beginners through advanced users with real-time feedback
+- Trigger: User clicks "Tutorials" button to browse available tutorials, then starts one
+- Progression: Browse tutorials → Select difficulty level → Start tutorial → Follow step instructions → Execute commands → Receive validation → Progress to next step → Complete tutorial
+- Success criteria: Tutorial panel shows current step clearly, validates commands accurately, provides helpful hints, tracks progress persistently, and celebrates completion
+
 **Container Visualization**
 - Functionality: Visual representation of running containers with their status, ports, and resource usage
 - Purpose: Helps users understand what happens when containers are created, started, stopped, and removed
@@ -48,6 +55,9 @@ An interactive Docker playground that simulates Docker concepts and commands to 
 - **Port Conflicts**: Show warning when attempting to use already-bound ports
 - **Stopped Container Actions**: Prevent operations on stopped containers that require running state with clear messaging
 - **Empty States**: Show helpful guidance when no containers or images exist yet
+- **Tutorial Progress**: Persist tutorial progress across sessions so users can resume where they left off
+- **Wrong Tutorial Command**: When user types valid Docker command but not the one tutorial expects, acknowledge it works but guide them back to tutorial path
+- **Tutorial State Validation**: Use both command matching and state validation to ensure tutorial steps are properly completed
 
 ## Design Direction
 

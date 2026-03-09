@@ -29,3 +29,32 @@ export interface CommandResult {
   output: string
   error?: string
 }
+
+export interface TutorialStep {
+  id: string
+  title: string
+  description: string
+  expectedCommand: string | string[]
+  hints: string[]
+  validation?: (state: { containers: DockerContainer[], images: DockerImage[] }) => boolean
+  successMessage: string
+}
+
+export interface Tutorial {
+  id: string
+  title: string
+  description: string
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  estimatedTime: string
+  icon: string
+  steps: TutorialStep[]
+}
+
+export interface TutorialProgress {
+  tutorialId: string
+  currentStepIndex: number
+  completedSteps: string[]
+  completed: boolean
+  startedAt: number
+  completedAt?: number
+}
