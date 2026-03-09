@@ -546,6 +546,12 @@ function App() {
         open={achievementsOpen} 
         onOpenChange={setAchievementsOpen}
         unlockedAchievements={unlockedAchievements || []}
+        achievementData={{
+          tutorialProgresses: tutorialProgresses || {},
+          containers: currentContainers,
+          images: currentImages,
+          totalCommandsExecuted: totalCommandsExecuted || 0
+        }}
       />
       <Toaster theme="dark" position="bottom-right" />
     </div>

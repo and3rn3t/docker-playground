@@ -2,21 +2,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { AchievementBadge } from '@/components/AchievementBadge'
 import { achievements } from '@/lib/achievements'
-import { UnlockedAchievement } from '@/lib/types'
+import { UnlockedAchievement, AchievementCheckData } from '@/lib/types'
 import { Sparkle, Lock } from '@phosphor-icons/react'
 
 interface AchievementsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   unlockedAchievements: UnlockedAchievement[]
+  achievementData: AchievementCheckData
 }
 
 export function AchievementsDialog({ 
   open, 
   onOpenChange,
-  unlockedAchievements 
+  unlockedAchievements,
+  achievementData
 }: AchievementsDialogProps) {
   const unlockedIds = new Set(unlockedAchievements.map(a => a.achievementId))
   
@@ -80,22 +83,38 @@ export function AchievementsDialog({
               <h3 className="text-sm font-semibold text-muted-foreground">Locked ({locked.length})</h3>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {locked.map((achievement) => (
-                <div 
-                  key={achievement.id}
-                  className="group cursor-pointer"
-                >
-                  <AchievementBadge 
-                    achievement={achievement} 
-                    unlocked={false}
-                    size="lg"
-                    showTitle
-                  />
-                  <p className="text-xs text-center text-muted-foreground mt-2 px-2">
-                    {achievement.description}
-                  </p>
-                </div>
-              ))}
+              {locked.map((achievement) => {
+                const progress = achievement.progress ? achievement.progress(achievementData) : null
+                const progressPercent = progress ? Math.round((progress.current / progress.target) * 100) : 0
+                
+                return (
+                  <div 
+                    key={achievement.id}
+                    className="group cursor-pointer"
+                  >
+                    <AchievementBadge 
+                      achievement={achievement} 
+                      unlocked={false}
+                      size="lg"
+                      showTitle
+                    />
+                    <p className="text-xs text-center text-muted-foreground mt-2 px-2">
+                      {achievement.description}
+                    </p>
+                    {progress && (
+                      <div className="mt-2 px-2">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-mono font-semibold text-primary">
+                            {progress.current} / {progress.target}
+                          </span>
+                        </div>
+                        <Progress value={progressPercent} className="h-1.5" />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -111,24 +130,45 @@ export function AchievementsDialog({
             <Sparkle weight="duotone" className="text-accent text-2xl" />
             <span>Achievements</span>
           </DialogTitle>
-          <div className="flex items-center gap-4 pt-2">
-            <div className="flex-1">
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Progress</span>
-                <span className="font-mono font-semibold">
-                  {unlockedCount} / {totalCount}
-                </span>
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Overall Progress</span>
+                  <span className="font-mono font-semibold">
+                    {unlockedCount} / {totalCount}
+                  </span>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500 glow-accent"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-accent transition-all duration-500 glow-accent"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+              <Badge variant="secondary" className="font-mono text-lg px-3 py-1">
+                {progressPercent}%
+              </Badge>
             </div>
-            <Badge variant="secondary" className="font-mono">
-              {progressPercent}%
-            </Badge>
+            
+            <div className="grid grid-cols-4 gap-2">
+              {Object.entries(achievementsByRarity).slice(1).map(([rarity, list]) => {
+                const unlockedInRarity = list.filter(a => unlockedIds.has(a.id)).length
+                const totalInRarity = list.length
+                const percentInRarity = totalInRarity > 0 ? Math.round((unlockedInRarity / totalInRarity) * 100) : 0
+                
+                return (
+                  <div key={rarity} className="bg-card border border-border rounded-lg p-2">
+                    <div className="text-xs text-muted-foreground capitalize mb-1">{rarity}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-mono font-semibold">{unlockedInRarity}/{totalInRarity}</span>
+                      <span className="text-xs text-muted-foreground">{percentInRarity}%</span>
+                    </div>
+                    <Progress value={percentInRarity} className="h-1 mt-1" />
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </DialogHeader>
 
@@ -166,7 +206,7 @@ export function AchievementsDialog({
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="h-[55vh] mt-4 pr-4">
+          <ScrollArea className="h-[48vh] mt-4 pr-4">
             <TabsContent value="all">
               {renderAchievementList(achievementsByRarity.all)}
             </TabsContent>

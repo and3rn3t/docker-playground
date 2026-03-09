@@ -59,6 +59,10 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return Object.values(data.tutorialProgresses).filter(p => p.completed).length >= 3
+    },
+    progress: (data) => {
+      const current = Object.values(data.tutorialProgresses).filter(p => p.completed).length
+      return { current, target: 3 }
     }
   },
   {
@@ -70,6 +74,11 @@ export const achievements: Achievement[] = [
     requirement: (data) => {
       const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations']
       return allTutorialIds.every(id => data.tutorialProgresses[id]?.completed === true)
+    },
+    progress: (data) => {
+      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations']
+      const current = allTutorialIds.filter(id => data.tutorialProgresses[id]?.completed === true).length
+      return { current, target: allTutorialIds.length }
     }
   },
   {
@@ -80,6 +89,9 @@ export const achievements: Achievement[] = [
     rarity: 'common',
     requirement: (data) => {
       return data.totalCommandsExecuted >= 50
+    },
+    progress: (data) => {
+      return { current: Math.min(data.totalCommandsExecuted, 50), target: 50 }
     }
   },
   {
@@ -90,6 +102,9 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.totalCommandsExecuted >= 200
+    },
+    progress: (data) => {
+      return { current: Math.min(data.totalCommandsExecuted, 200), target: 200 }
     }
   },
   {
@@ -100,6 +115,10 @@ export const achievements: Achievement[] = [
     rarity: 'epic',
     requirement: (data) => {
       return data.containers.filter(c => c.status === 'running').length >= 10
+    },
+    progress: (data) => {
+      const current = data.containers.filter(c => c.status === 'running').length
+      return { current: Math.min(current, 10), target: 10 }
     }
   },
   {
@@ -110,6 +129,9 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.images.length >= 10
+    },
+    progress: (data) => {
+      return { current: Math.min(data.images.length, 10), target: 10 }
     }
   },
   {

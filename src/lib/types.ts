@@ -66,6 +66,7 @@ export interface Achievement {
   icon: string
   rarity: 'common' | 'rare' | 'epic' | 'legendary'
   requirement: (data: AchievementCheckData) => boolean
+  progress?: (data: AchievementCheckData) => { current: number; target: number }
 }
 
 export interface AchievementCheckData {
