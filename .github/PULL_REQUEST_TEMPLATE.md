@@ -12,7 +12,7 @@ Brief description of the change.
 ## Checklist
 
 - [ ] Tested locally with `npm run dev`
-- [ ] No TypeScript errors (`tsc -b --noCheck` passes)
+- [ ] Build succeeds (`npm run build`)
 - [ ] ESLint passes (`npm run lint`)
 - [ ] No direct mutation of containers/images outside the parser
 - [ ] `src/components/ui/` files were NOT modified

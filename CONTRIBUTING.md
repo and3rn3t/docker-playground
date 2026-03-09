@@ -7,7 +7,7 @@ npm install
 npm run dev
 ```
 
-The dev server starts at `http://localhost:5000`.
+The dev server starts at `http://localhost:5173` (Vite default).
 
 ## Project Structure
 
