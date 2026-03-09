@@ -11,11 +11,12 @@ import { AchievementToast } from '@/components/AchievementToast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X, Sparkle } from '@phosphor-icons/react'
+import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X, Sparkle, Sun, Moon } from '@phosphor-icons/react'
 import { getAchievementById } from '@/lib/achievements'
 import { toast, Toaster } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useDockerState } from '@/hooks/useDockerState'
+import { useTheme } from '@/hooks/useTheme'
 
 function App() {
   const {
@@ -39,6 +40,8 @@ function App() {
     handleRemoveContainer,
     handleRemoveImage,
   } = useDockerState()
+
+  const { theme, toggleTheme } = useTheme()
 
   const [helpOpen, setHelpOpen] = useState(false)
   const [tutorialsOpen, setTutorialsOpen] = useState(false)
@@ -98,6 +101,9 @@ function App() {
                 <Button onClick={() => setHelpOpen(true)} variant="outline" size="sm" aria-label="Show help">
                   <Question weight="bold" />
                   <span className="hidden sm:inline">Help</span>
+                </Button>
+                <Button onClick={toggleTheme} variant="ghost" size="sm" aria-label="Toggle theme">
+                  {theme === 'dark' ? <Sun weight="bold" /> : <Moon weight="bold" />}
                 </Button>
               </div>
             </div>
@@ -272,7 +278,7 @@ function App() {
           totalCommandsExecuted: totalCommandsExecuted || 0
         }}
       />
-      <Toaster theme="dark" position="bottom-right" />
+      <Toaster theme={theme} position="bottom-right" />
     </div>
   )
 }

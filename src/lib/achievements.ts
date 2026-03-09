@@ -80,6 +80,10 @@ export const achievements: Achievement[] = [
         'image-tagging',
         'cleanup-workflows',
         'docker-networking',
+        'volumes-deep-dive',
+        'container-debugging',
+        'port-mapping',
+        'env-vars-config',
       ]
       return allTutorialIds.every((id) => data.tutorialProgresses[id]?.completed === true)
     },
@@ -92,6 +96,10 @@ export const achievements: Achievement[] = [
         'image-tagging',
         'cleanup-workflows',
         'docker-networking',
+        'volumes-deep-dive',
+        'container-debugging',
+        'port-mapping',
+        'env-vars-config',
       ]
 
       const current = allTutorialIds.filter(
@@ -237,6 +245,70 @@ export const achievements: Achievement[] = [
     rarity: 'epic',
     requirement: (data) => {
       return data.tutorialProgresses['docker-networking']?.completed === true
+    },
+  },
+  {
+    id: 'volume-virtuoso',
+    title: 'Volume Virtuoso',
+    description: 'Complete the "Docker Volumes Deep-Dive" tutorial',
+    icon: 'database',
+    rarity: 'rare',
+    requirement: (data) => {
+      return data.tutorialProgresses['volumes-deep-dive']?.completed === true
+    },
+  },
+  {
+    id: 'bug-hunter',
+    title: 'Bug Hunter',
+    description: 'Complete the "Container Debugging" tutorial',
+    icon: 'bug',
+    rarity: 'rare',
+    requirement: (data) => {
+      return data.tutorialProgresses['container-debugging']?.completed === true
+    },
+  },
+  {
+    id: 'port-master',
+    title: 'Port Master',
+    description: 'Complete the "Port Mapping Mastery" tutorial',
+    icon: 'plug',
+    rarity: 'common',
+    requirement: (data) => {
+      return data.tutorialProgresses['port-mapping']?.completed === true
+    },
+  },
+  {
+    id: 'config-wizard',
+    title: 'Config Wizard',
+    description: 'Complete the "Environment Variables & Config" tutorial',
+    icon: 'gear',
+    rarity: 'common',
+    requirement: (data) => {
+      return data.tutorialProgresses['env-vars-config']?.completed === true
+    },
+  },
+  {
+    id: 'snapshot-artist',
+    title: 'Snapshot Artist',
+    description: 'Create an image from a running container using docker commit',
+    icon: 'camera',
+    rarity: 'rare',
+    requirement: (data) => {
+      return data.totalCommandsExecuted >= 10 && data.images.length >= 5
+    },
+  },
+  {
+    id: 'halfway-there',
+    title: 'Halfway There',
+    description: 'Complete 5 tutorials',
+    icon: 'star-half',
+    rarity: 'rare',
+    requirement: (data) => {
+      return Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 5
+    },
+    progress: (data) => {
+      const current = Object.values(data.tutorialProgresses).filter((p) => p.completed).length
+      return { current, target: 5 }
     },
   },
 ]

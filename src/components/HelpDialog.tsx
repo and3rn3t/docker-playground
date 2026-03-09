@@ -70,6 +70,54 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           description: 'Resume a paused container',
           options: '',
           example: 'docker unpause web'
+        },
+        {
+          command: 'docker cp SRC DEST',
+          description: 'Copy files between container and local filesystem',
+          options: 'Use CONTAINER:PATH for the container side',
+          example: 'docker cp web:/etc/nginx/nginx.conf ./nginx.conf'
+        },
+        {
+          command: 'docker commit CONTAINER IMAGE',
+          description: 'Create a new image from a container\'s changes',
+          options: '',
+          example: 'docker commit web my-custom-nginx:v1'
+        },
+        {
+          command: 'docker stats',
+          description: 'Display resource usage statistics for running containers',
+          options: '',
+          example: 'docker stats'
+        },
+        {
+          command: 'docker top CONTAINER',
+          description: 'Display the running processes of a container',
+          options: '',
+          example: 'docker top web'
+        },
+        {
+          command: 'docker diff CONTAINER',
+          description: 'Show filesystem changes made inside a container',
+          options: '',
+          example: 'docker diff web'
+        },
+        {
+          command: 'docker port CONTAINER',
+          description: 'List port mappings for a container',
+          options: '',
+          example: 'docker port web'
+        },
+        {
+          command: 'docker export CONTAINER',
+          description: 'Export a container\'s filesystem as a tar archive',
+          options: '',
+          example: 'docker export web > web.tar'
+        },
+        {
+          command: 'docker import FILE [IMAGE]',
+          description: 'Create an image from a tarball',
+          options: '',
+          example: 'docker import backup.tar myimage:latest'
         }
       ]
     },
@@ -105,6 +153,76 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           description: 'Show image layer history',
           options: '',
           example: 'docker history nginx:latest'
+        },
+        {
+          command: 'docker save IMAGE',
+          description: 'Save an image to a tar archive (simulated)',
+          options: '',
+          example: 'docker save nginx > nginx.tar'
+        },
+        {
+          command: 'docker load -i FILE',
+          description: 'Load an image from a tar archive (simulated)',
+          options: '-i FILE or --input FILE',
+          example: 'docker load -i nginx.tar'
+        }
+      ]
+    },
+    {
+      category: 'Network Commands',
+      items: [
+        {
+          command: 'docker network create NAME',
+          description: 'Create a new network',
+          options: '--driver DRIVER (default: bridge)',
+          example: 'docker network create my-net'
+        },
+        {
+          command: 'docker network ls',
+          description: 'List all networks',
+          options: '',
+          example: 'docker network ls'
+        },
+        {
+          command: 'docker network rm NETWORK',
+          description: 'Remove a network',
+          options: '',
+          example: 'docker network rm my-net'
+        },
+        {
+          command: 'docker network connect NETWORK CONTAINER',
+          description: 'Connect a container to a network',
+          options: '',
+          example: 'docker network connect my-net web'
+        },
+        {
+          command: 'docker network disconnect NETWORK CONTAINER',
+          description: 'Disconnect a container from a network',
+          options: '',
+          example: 'docker network disconnect my-net web'
+        }
+      ]
+    },
+    {
+      category: 'Volume Commands',
+      items: [
+        {
+          command: 'docker volume create NAME',
+          description: 'Create a new volume',
+          options: '',
+          example: 'docker volume create my-data'
+        },
+        {
+          command: 'docker volume ls',
+          description: 'List all volumes',
+          options: '',
+          example: 'docker volume ls'
+        },
+        {
+          command: 'docker volume rm VOLUME',
+          description: 'Remove a volume',
+          options: '',
+          example: 'docker volume rm my-data'
         }
       ]
     },

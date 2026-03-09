@@ -13,8 +13,14 @@ export function parseCommand(
   updateState: (newState: DockerState) => void
 ): CommandResult {
   const parts = command.trim().split(/\s+/)
-  const mainCommand = parts[0]?.toLowerCase()
+  let mainCommand = parts[0]?.toLowerCase()
   const subCommand = parts[1]?.toLowerCase()
+
+  // Support 'd' as alias for 'docker'
+  if (mainCommand === 'd') {
+    mainCommand = 'docker'
+    parts[0] = 'docker'
+  }
 
   if (command.trim() === 'help' || (mainCommand === 'docker' && subCommand === 'help')) {
     return {
@@ -87,6 +93,24 @@ export function parseCommand(
       return handleVolume(parts, state, updateState)
     case 'cp':
       return handleCp(parts, state)
+    case 'commit':
+      return handleCommit(parts, state, updateState)
+    case 'stats':
+      return handleStats(state)
+    case 'top':
+      return handleTop(parts, state)
+    case 'diff':
+      return handleDiff(parts, state)
+    case 'port':
+      return handlePort(parts, state)
+    case 'save':
+      return handleSave(parts, state)
+    case 'load':
+      return handleLoad(parts, state, updateState)
+    case 'export':
+      return handleExport(parts, state)
+    case 'import':
+      return handleImport(parts, state, updateState)
     default:
       return {
         success: false,
@@ -978,6 +1002,221 @@ function handleCp(parts: string[], state: DockerState): CommandResult {
   }
 }
 
+function handleCommit(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const containerRef = parts[2]
+  const imageRef = parts[3]
+  if (!containerRef || !imageRef) {
+    return { success: false, output: '', error: 'docker commit: requires CONTAINER IMAGE[:TAG]' }
+  }
+
+  const container = findContainer(containerRef, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${containerRef}` }
+  }
+
+  const [name, tag = 'latest'] = imageRef.split(':')
+  if (state.images.find(img => img.name === name && img.tag === tag)) {
+    return { success: false, output: '', error: `Image ${name}:${tag} already exists` }
+  }
+
+  const sourceImage = state.images.find(img => img.name + ':' + img.tag === container.image)
+
+  const newImage: DockerImage = {
+    id: generateId(),
+    name: name || '',
+    tag,
+    size: sourceImage ? sourceImage.size : generateSize(),
+    created: Date.now(),
+    layers: sourceImage ? [...sourceImage.layers, generateId().substring(0, 12)] : generateLayers(name || '')
+  }
+
+  updateState({ ...state, images: [...state.images, newImage] })
+  return { success: true, output: `sha256:${newImage.id.substring(0, 64)}` }
+}
+
+function handleStats(state: DockerState): CommandResult {
+  const running = state.containers.filter(c => c.status === 'running')
+
+  if (running.length === 0) {
+    return { success: true, output: 'No running containers' }
+  }
+
+  const header = 'CONTAINER ID   NAME           CPU %     MEM USAGE / LIMIT     MEM %     NET I/O          BLOCK I/O        PIDS'
+  const rows = running.map(c => {
+    const id = c.id.substring(0, 12)
+    const cpu = (Math.random() * 15).toFixed(2) + '%'
+    const memUsage = Math.floor(Math.random() * 256) + 16
+    const memLimit = 512
+    const memPercent = ((memUsage / memLimit) * 100).toFixed(2) + '%'
+    const netIn = (Math.random() * 100).toFixed(1) + 'MB'
+    const netOut = (Math.random() * 50).toFixed(1) + 'MB'
+    const blockIn = (Math.random() * 200).toFixed(1) + 'MB'
+    const blockOut = (Math.random() * 100).toFixed(1) + 'MB'
+    const pids = Math.floor(Math.random() * 20) + 1
+    return `${id.padEnd(15)}${c.name.padEnd(15)}${cpu.padEnd(10)}${memUsage}MiB / ${memLimit}MiB${(' ').padEnd(5)}${memPercent.padEnd(10)}${netIn} / ${netOut}${(' ').padEnd(3)}${blockIn} / ${blockOut}${(' ').padEnd(3)}${pids}`
+  })
+
+  return { success: true, output: [header, ...rows].join('\n') }
+}
+
+function handleTop(parts: string[], state: DockerState): CommandResult {
+  const containerRef = parts[2]
+  if (!containerRef) {
+    return { success: false, output: '', error: 'docker top: container name or ID required' }
+  }
+
+  const container = findContainer(containerRef, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${containerRef}` }
+  }
+
+  if (container.status !== 'running') {
+    return { success: false, output: '', error: `Container ${containerRef} is not running` }
+  }
+
+  const header = 'UID        PID   PPID  C  STIME  TTY    TIME     CMD'
+  const mainCmd = container.command || '/bin/sh'
+  const rows = [
+    `root       1     0     0  ${new Date().toTimeString().substring(0, 5)}  ?      00:00:01 ${mainCmd}`,
+    `root       ${Math.floor(Math.random() * 90) + 10}    1     0  ${new Date().toTimeString().substring(0, 5)}  ?      00:00:00 /bin/sh`
+  ]
+
+  return { success: true, output: [header, ...rows].join('\n') }
+}
+
+function handleDiff(parts: string[], state: DockerState): CommandResult {
+  const containerRef = parts[2]
+  if (!containerRef) {
+    return { success: false, output: '', error: 'docker diff: container name or ID required' }
+  }
+
+  const container = findContainer(containerRef, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${containerRef}` }
+  }
+
+  const changes = [
+    'C /var',
+    'C /var/log',
+    'A /var/log/app.log',
+    'C /tmp',
+    'A /tmp/cache',
+    'C /etc',
+    'C /etc/hostname'
+  ]
+
+  return {
+    success: true,
+    output: changes.join('\n') + '\n(simulated filesystem changes — C=changed, A=added, D=deleted)'
+  }
+}
+
+function handlePort(parts: string[], state: DockerState): CommandResult {
+  const containerRef = parts[2]
+  if (!containerRef) {
+    return { success: false, output: '', error: 'docker port: container name or ID required' }
+  }
+
+  const container = findContainer(containerRef, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${containerRef}` }
+  }
+
+  if (container.ports.length === 0) {
+    return { success: true, output: '' }
+  }
+
+  const lines = container.ports.map(p => {
+    const [host, containerPort] = p.split(':')
+    return `${containerPort}/tcp -> 0.0.0.0:${host}`
+  })
+
+  return { success: true, output: lines.join('\n') }
+}
+
+function handleSave(parts: string[], state: DockerState): CommandResult {
+  const imageRef = parts[2]
+  if (!imageRef) {
+    return { success: false, output: '', error: 'docker save: image name or ID required. Usage: docker save IMAGE' }
+  }
+
+  const image = state.images.find(img =>
+    `${img.name}:${img.tag}` === imageRef || img.name === imageRef || img.id.startsWith(imageRef)
+  )
+  if (!image) {
+    return { success: false, output: '', error: `No such image: ${imageRef}` }
+  }
+
+  return {
+    success: true,
+    output: `Saved image ${image.name}:${image.tag} (${image.size})\n(simulated — in reality this writes a tar archive to stdout)`
+  }
+}
+
+function handleLoad(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const inputFlag = parts.indexOf('-i') !== -1 || parts.indexOf('--input') !== -1
+  if (!inputFlag && parts.length < 3) {
+    return { success: false, output: '', error: 'docker load: requires -i FILE or input. Usage: docker load -i FILE' }
+  }
+
+  const newImage: DockerImage = {
+    id: generateId(),
+    name: 'loaded-image',
+    tag: 'latest',
+    size: generateSize(),
+    created: Date.now(),
+    layers: generateLayers('loaded-image')
+  }
+
+  updateState({ ...state, images: [...state.images, newImage] })
+  return {
+    success: true,
+    output: `Loaded image: ${newImage.name}:${newImage.tag}\n(simulated — in reality this reads a tar archive)`
+  }
+}
+
+function handleExport(parts: string[], state: DockerState): CommandResult {
+  const containerRef = parts[2]
+  if (!containerRef) {
+    return { success: false, output: '', error: 'docker export: container name or ID required. Usage: docker export CONTAINER' }
+  }
+
+  const container = findContainer(containerRef, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${containerRef}` }
+  }
+
+  return {
+    success: true,
+    output: `Exported container ${container.name} filesystem\n(simulated — in reality this writes a tar archive to stdout)`
+  }
+}
+
+function handleImport(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const fileOrUrl = parts[2]
+  const imageRef = parts[3]
+  if (!fileOrUrl) {
+    return { success: false, output: '', error: 'docker import: requires FILE|URL [REPOSITORY[:TAG]]. Usage: docker import file.tar myimage:latest' }
+  }
+
+  const [name, tag = 'latest'] = (imageRef || 'imported-image').split(':')
+
+  const newImage: DockerImage = {
+    id: generateId(),
+    name: name || 'imported-image',
+    tag,
+    size: generateSize(),
+    created: Date.now(),
+    layers: [generateId().substring(0, 12)]
+  }
+
+  updateState({ ...state, images: [...state.images, newImage] })
+  return {
+    success: true,
+    output: `sha256:${newImage.id.substring(0, 64)}`
+  }
+}
+
 function findContainer(ref: string, containers: DockerContainer[]): DockerContainer | undefined {
   return containers.find(c => 
     c.id.startsWith(ref) || 
@@ -1038,6 +1277,13 @@ Container Commands:
   docker pause CONTAINER      Pause a running container
   docker unpause CONTAINER    Resume a paused container
   docker cp SRC DEST          Copy files between container and host
+  docker commit CONTAINER IMG Create image from a container's changes
+  docker stats                Show resource usage of running containers
+  docker top CONTAINER        Show running processes in a container
+  docker diff CONTAINER       Show filesystem changes in a container
+  docker port CONTAINER       List port mappings for a container
+  docker export CONTAINER     Export container filesystem as tar archive
+  docker import FILE [IMAGE]  Create image from a tarball
 
 Image Commands:
   docker images               List all images
@@ -1045,6 +1291,8 @@ Image Commands:
   docker rmi IMAGE            Remove an image
   docker tag SOURCE TARGET    Create a tag TARGET from SOURCE image
   docker history IMAGE        Show image layer history
+  docker save IMAGE           Save image to a tar archive
+  docker load -i FILE         Load image from a tar archive
 
 Network Commands:
   docker network create NAME  Create a new network
@@ -1075,6 +1323,12 @@ Examples:
   docker stop web db
   docker rm web db
   docker tag nginx myregistry/nginx:v1
+  docker commit web my-custom-nginx:v1
+  docker stats
+  docker top web
+  docker diff web
+  docker save nginx > nginx.tar
+  docker load -i nginx.tar
   docker network create my-net
   docker network connect my-net web
   docker volume create my-data

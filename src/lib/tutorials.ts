@@ -666,6 +666,350 @@ export const tutorials: Tutorial[] = [
         successMessage: 'Excellent! You\'ve mastered Docker networking — networks isolate services and enable secure communication between containers.'
       }
     ]
+  },
+  {
+    id: 'volumes-deep-dive',
+    title: 'Docker Volumes Deep-Dive',
+    description: 'Master persistent data storage with Docker volumes — create, mount, share, and manage volumes.',
+    difficulty: 'intermediate',
+    estimatedTime: '10 min',
+    icon: 'database',
+    steps: [
+      {
+        id: 'create-volume',
+        title: 'Create a named volume',
+        description: 'Docker volumes persist data beyond a container\'s lifecycle. Create a named volume for your database.',
+        expectedCommand: ['docker volume create db-data'],
+        hints: [
+          'Use docker volume create followed by a name',
+          'Try: docker volume create db-data'
+        ],
+        successMessage: 'Volume created! Named volumes are managed by Docker and stored in a special location on the host.'
+      },
+      {
+        id: 'list-volumes',
+        title: 'List your volumes',
+        description: 'Check that the volume was created by listing all available volumes.',
+        expectedCommand: ['docker volume ls'],
+        hints: [
+          'Use docker volume ls to see all volumes',
+          'Try: docker volume ls'
+        ],
+        successMessage: 'You can see the db-data volume is ready to use.'
+      },
+      {
+        id: 'run-with-volume',
+        title: 'Run a container with a volume',
+        description: 'Mount the volume into a Postgres container so its data persists across restarts.',
+        expectedCommand: ['docker run -d --name db -v db-data:/var/lib/postgresql/data postgres:16'],
+        hints: [
+          'Use -v VOLUME_NAME:CONTAINER_PATH to mount a named volume',
+          'The Postgres data directory is /var/lib/postgresql/data',
+          'Try: docker run -d --name db -v db-data:/var/lib/postgresql/data postgres:16'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'db' && c.volumes.length > 0)
+        },
+        successMessage: 'Container running with a mounted volume! Data written to /var/lib/postgresql/data will survive container removal.'
+      },
+      {
+        id: 'share-volume',
+        title: 'Share a volume between containers',
+        description: 'Mount the same volume into another container. Useful for backup or sidecar patterns.',
+        expectedCommand: ['docker run -d --name db-backup -v db-data:/backup redis:alpine'],
+        hints: [
+          'Use -v with the same volume name but a different mount point',
+          'Try: docker run -d --name db-backup -v db-data:/backup redis:alpine'
+        ],
+        validation: (state) => {
+          return state.containers.filter(c => c.volumes.length > 0).length >= 2
+        },
+        successMessage: 'Two containers now share the same volume — a common pattern for backup, migration, and data exchange.'
+      },
+      {
+        id: 'inspect-volume-container',
+        title: 'Inspect the container\'s volumes',
+        description: 'Use docker inspect to see how the volume is mounted.',
+        expectedCommand: ['docker inspect db'],
+        hints: [
+          'docker inspect shows detailed info including volume mounts',
+          'Try: docker inspect db'
+        ],
+        successMessage: 'You can see the volume mount details in the inspector output.'
+      },
+      {
+        id: 'cleanup-volumes',
+        title: 'Clean up containers and volumes',
+        description: 'Stop and remove the containers, then remove the volume.',
+        expectedCommand: ['docker stop db', 'docker stop db-backup', 'docker rm db', 'docker rm db-backup', 'docker volume rm db-data'],
+        hints: [
+          'Stop and remove containers first, then remove the volume',
+          'Try: docker stop db, then docker rm db, then docker volume rm db-data'
+        ],
+        validation: (state) => {
+          return state.containers.filter(c => c.name === 'db' || c.name === 'db-backup').length === 0
+        },
+        successMessage: 'All cleaned up! Remember: named volumes persist until explicitly removed, even after the container is deleted.'
+      }
+    ]
+  },
+  {
+    id: 'container-debugging',
+    title: 'Container Debugging',
+    description: 'Learn essential debugging commands — exec, logs, top, diff, and inspect for troubleshooting containers.',
+    difficulty: 'intermediate',
+    estimatedTime: '10 min',
+    icon: 'bug',
+    steps: [
+      {
+        id: 'run-debug-container',
+        title: 'Run a container to debug',
+        description: 'Start an nginx container that we\'ll investigate.',
+        expectedCommand: ['docker run -d --name debug-web -p 8080:80 nginx:latest', 'docker run -d --name debug-web -p 8080:80 nginx'],
+        hints: [
+          'Run nginx with port mapping and a name',
+          'Try: docker run -d --name debug-web -p 8080:80 nginx:latest'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'debug-web' && c.status === 'running')
+        },
+        successMessage: 'Container running. Let\'s start investigating!'
+      },
+      {
+        id: 'view-logs',
+        title: 'Check the logs',
+        description: 'The first debugging step is usually checking container logs for errors.',
+        expectedCommand: ['docker logs debug-web'],
+        hints: [
+          'docker logs shows the stdout/stderr output of a container',
+          'Try: docker logs debug-web'
+        ],
+        successMessage: 'Logs are your first line of defense when debugging containers.'
+      },
+      {
+        id: 'exec-into-container',
+        title: 'Execute a command inside the container',
+        description: 'Sometimes you need a shell inside the container. Run a command.',
+        expectedCommand: ['docker exec debug-web ls /etc/nginx', 'docker exec debug-web cat /etc/nginx/nginx.conf'],
+        hints: [
+          'Use docker exec CONTAINER COMMAND to run commands inside',
+          'Try: docker exec debug-web ls /etc/nginx'
+        ],
+        successMessage: 'docker exec lets you run arbitrary commands inside a running container — essential for debugging.'
+      },
+      {
+        id: 'check-processes',
+        title: 'View running processes',
+        description: 'Check what processes are running inside the container.',
+        expectedCommand: ['docker top debug-web'],
+        hints: [
+          'docker top shows the running processes like the Unix "top" command',
+          'Try: docker top debug-web'
+        ],
+        successMessage: 'docker top helps identify runaway processes or unexpected daemons.'
+      },
+      {
+        id: 'check-changes',
+        title: 'View filesystem changes',
+        description: 'See what files were modified inside the container compared to the base image.',
+        expectedCommand: ['docker diff debug-web'],
+        hints: [
+          'docker diff shows filesystem changes (Added, Changed, Deleted)',
+          'Try: docker diff debug-web'
+        ],
+        successMessage: 'docker diff is useful for understanding what a container has modified — great for auditing.'
+      },
+      {
+        id: 'inspect-details',
+        title: 'Deep inspect the container',
+        description: 'Get the full JSON details of the container configuration.',
+        expectedCommand: ['docker inspect debug-web'],
+        hints: [
+          'docker inspect gives you the complete container configuration',
+          'Try: docker inspect debug-web'
+        ],
+        successMessage: 'docker inspect gives you everything — state, network, mounts, config. It\'s the ultimate debugging tool.'
+      },
+      {
+        id: 'check-ports',
+        title: 'Check port mappings',
+        description: 'Verify which ports are mapped from the container to the host.',
+        expectedCommand: ['docker port debug-web'],
+        hints: [
+          'docker port lists the port mappings for a container',
+          'Try: docker port debug-web'
+        ],
+        successMessage: 'Port mapping confirmed. Useful when you have multiple services on different ports.'
+      },
+      {
+        id: 'cleanup-debug',
+        title: 'Clean up',
+        description: 'Force-remove the container.',
+        expectedCommand: ['docker rm -f debug-web'],
+        hints: [
+          'Use -f to force-remove a running container without stopping first',
+          'Try: docker rm -f debug-web'
+        ],
+        validation: (state) => {
+          return !state.containers.some(c => c.name === 'debug-web')
+        },
+        successMessage: 'Great job! You now know the essential debugging workflow: logs → exec → top → diff → inspect → port.'
+      }
+    ]
+  },
+  {
+    id: 'port-mapping',
+    title: 'Port Mapping Mastery',
+    description: 'Understand how Docker exposes container services to the outside world with port mappings.',
+    difficulty: 'beginner',
+    estimatedTime: '8 min',
+    icon: 'plug',
+    steps: [
+      {
+        id: 'run-with-port',
+        title: 'Run a container with a port',
+        description: 'The -p flag maps a host port to a container port. Map port 8080 on your machine to port 80 in the container.',
+        expectedCommand: ['docker run -d --name web1 -p 8080:80 nginx:latest', 'docker run -d --name web1 -p 8080:80 nginx'],
+        hints: [
+          'Format: -p HOST_PORT:CONTAINER_PORT',
+          'Host port 8080 will forward to container port 80',
+          'Try: docker run -d --name web1 -p 8080:80 nginx:latest'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'web1' && c.ports.includes('8080:80'))
+        },
+        successMessage: 'You\'d now be able to visit http://localhost:8080 to see the nginx welcome page!'
+      },
+      {
+        id: 'run-different-port',
+        title: 'Map a different port',
+        description: 'Run another nginx container on a different host port to avoid conflicts.',
+        expectedCommand: ['docker run -d --name web2 -p 9090:80 nginx:latest', 'docker run -d --name web2 -p 9090:80 nginx'],
+        hints: [
+          'Each container can use the same internal port, but different host ports',
+          'Port 8080 is taken, try another like 9090',
+          'Try: docker run -d --name web2 -p 9090:80 nginx:latest'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'web2' && c.ports.includes('9090:80'))
+        },
+        successMessage: 'Two containers on different host ports, same internal port. This is how you run multiple services!'
+      },
+      {
+        id: 'check-ports-mapping',
+        title: 'Verify port mappings',
+        description: 'Check the port mappings for your first container.',
+        expectedCommand: ['docker port web1'],
+        hints: [
+          'docker port shows the post mappings for a container',
+          'Try: docker port web1'
+        ],
+        successMessage: 'The output shows which container ports are mapped to which host ports.'
+      },
+      {
+        id: 'list-all-containers',
+        title: 'View all containers and their ports',
+        description: 'List containers to see all the port mappings at a glance.',
+        expectedCommand: ['docker ps'],
+        hints: [
+          'docker ps shows running containers including their port mappings',
+          'Try: docker ps'
+        ],
+        successMessage: 'The PORTS column shows all your mappings — very handy for checking what\'s exposed.'
+      },
+      {
+        id: 'cleanup-ports',
+        title: 'Clean up both containers',
+        description: 'Force-remove both containers.',
+        expectedCommand: ['docker rm -f web1', 'docker rm -f web2', 'docker rm -f web1 web2'],
+        hints: [
+          'Use docker rm -f to force-remove running containers',
+          'Try: docker rm -f web1 then docker rm -f web2'
+        ],
+        validation: (state) => {
+          return !state.containers.some(c => c.name === 'web1' || c.name === 'web2')
+        },
+        successMessage: 'All clean! Remember: host ports must be unique, but container ports can be reused across containers.'
+      }
+    ]
+  },
+  {
+    id: 'env-vars-config',
+    title: 'Environment Variables & Config',
+    description: 'Learn to configure containers at runtime using environment variables — a core Docker pattern.',
+    difficulty: 'beginner',
+    estimatedTime: '8 min',
+    icon: 'gear',
+    steps: [
+      {
+        id: 'run-with-env',
+        title: 'Run a container with an environment variable',
+        description: 'Pass configuration via -e flag. Set POSTGRES_PASSWORD for the database.',
+        expectedCommand: ['docker run -d --name mydb -e POSTGRES_PASSWORD=secret postgres:16'],
+        hints: [
+          'Use -e KEY=VALUE to set environment variables',
+          'Postgres requires POSTGRES_PASSWORD to be set',
+          'Try: docker run -d --name mydb -e POSTGRES_PASSWORD=secret postgres:16'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'mydb' && Object.keys(c.env).length > 0)
+        },
+        successMessage: 'Container started with POSTGRES_PASSWORD configured. In real Docker, this sets up the DB password on first start.'
+      },
+      {
+        id: 'run-with-multiple-env',
+        title: 'Set multiple environment variables',
+        description: 'Container apps often need several config values. Run a Node.js app with multiple env vars.',
+        expectedCommand: ['docker run -d --name app -e NODE_ENV=production -e PORT=3000 node:20-alpine'],
+        hints: [
+          'Use multiple -e flags, one for each variable',
+          'Try: docker run -d --name app -e NODE_ENV=production -e PORT=3000 node:20-alpine'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'app' && Object.keys(c.env).length >= 2)
+        },
+        successMessage: 'Multiple env vars set! The 12-Factor App methodology recommends config via environment variables.'
+      },
+      {
+        id: 'inspect-env',
+        title: 'Inspect the environment config',
+        description: 'Verify the env vars are correctly set using docker inspect.',
+        expectedCommand: ['docker inspect app'],
+        hints: [
+          'docker inspect shows all configuration including environment variables',
+          'Try: docker inspect app'
+        ],
+        successMessage: 'The Env section in the output shows all your configured environment variables.'
+      },
+      {
+        id: 'run-with-combined',
+        title: 'Combine env vars with ports and volumes',
+        description: 'Real containers often use env vars, ports, and volumes together. Run a full setup.',
+        expectedCommand: ['docker run -d --name fullstack -p 5432:5432 -e POSTGRES_PASSWORD=mypass -v pgdata:/var/lib/postgresql/data postgres:16'],
+        hints: [
+          'Combine -p, -e, and -v flags in a single docker run command',
+          'Try: docker run -d --name fullstack -p 5432:5432 -e POSTGRES_PASSWORD=mypass -v pgdata:/var/lib/postgresql/data postgres:16'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'fullstack' && c.ports.length > 0 && Object.keys(c.env).length > 0)
+        },
+        successMessage: 'A production-like setup with ports, env vars, and persistent storage — this is how real services are deployed!'
+      },
+      {
+        id: 'cleanup-env',
+        title: 'Clean up all containers',
+        description: 'Remove all the containers we created.',
+        expectedCommand: ['docker rm -f mydb', 'docker rm -f app', 'docker rm -f fullstack', 'docker rm -f mydb app fullstack'],
+        hints: [
+          'Force-remove each container with docker rm -f',
+          'Try: docker rm -f mydb, then docker rm -f app, then docker rm -f fullstack'
+        ],
+        validation: (state) => {
+          return !state.containers.some(c => ['mydb', 'app', 'fullstack'].includes(c.name))
+        },
+        successMessage: 'Well done! You now understand how to configure containers with environment variables — a fundamental Docker skill.'
+      }
+    ]
   }
 ]
 

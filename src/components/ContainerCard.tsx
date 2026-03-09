@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Play, Stop, Trash } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useState, useEffect } from 'react'
 
 interface ContainerCardProps {
   container: DockerContainer
@@ -13,9 +14,38 @@ interface ContainerCardProps {
   onRemove: () => void
 }
 
+function useSimulatedStats(isRunning: boolean) {
+  const [stats, setStats] = useState({ cpu: 0, memory: 0 })
+
+  useEffect(() => {
+    if (!isRunning) {
+      setStats({ cpu: 0, memory: 0 })
+      return
+    }
+
+    // Set initial random values
+    setStats({
+      cpu: Math.random() * 12 + 1,
+      memory: Math.random() * 40 + 10,
+    })
+
+    const interval = setInterval(() => {
+      setStats(prev => ({
+        cpu: Math.max(0.1, Math.min(100, prev.cpu + (Math.random() - 0.5) * 4)),
+        memory: Math.max(5, Math.min(95, prev.memory + (Math.random() - 0.5) * 3)),
+      }))
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [isRunning])
+
+  return stats
+}
+
 export function ContainerCard({ container, onStop, onStart, onRemove }: ContainerCardProps) {
   const isRunning = container.status === 'running'
   const isPaused = container.status === 'paused'
+  const stats = useSimulatedStats(isRunning)
 
   return (
     <motion.div
@@ -77,6 +107,32 @@ export function ContainerCard({ container, onStop, onStart, onRemove }: Containe
                 </div>
               )}
             </div>
+            {isRunning && (
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-primary w-8">CPU</span>
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary rounded-full"
+                      animate={{ width: `${stats.cpu}%` }}
+                      transition={{ duration: 1, ease: 'easeInOut' }}
+                    />
+                  </div>
+                  <span className="text-muted-foreground w-10 text-right font-mono">{stats.cpu.toFixed(1)}%</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-primary w-8">MEM</span>
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-accent rounded-full"
+                      animate={{ width: `${stats.memory}%` }}
+                      transition={{ duration: 1, ease: 'easeInOut' }}
+                    />
+                  </div>
+                  <span className="text-muted-foreground w-10 text-right font-mono">{stats.memory.toFixed(1)}%</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1">

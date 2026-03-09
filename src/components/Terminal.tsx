@@ -14,13 +14,15 @@ interface TerminalProps {
 const DOCKER_SUBCOMMANDS = new Set([
   'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
   'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
-  'history', 'system', 'prune', 'network', 'volume', 'cp'
+  'history', 'system', 'prune', 'network', 'volume', 'cp',
+  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import'
 ])
 
 const COMPLETABLE_SUBCOMMANDS = [
   'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
   'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
-  'history', 'system', 'network', 'volume', 'cp'
+  'history', 'system', 'network', 'volume', 'cp',
+  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import'
 ]
 
 const NETWORK_SUBCOMMANDS = ['create', 'ls', 'rm', 'connect', 'disconnect']
@@ -68,7 +70,7 @@ function getCompletions(
   }
 
   // Complete container names for commands that take containers
-  const containerCommands = new Set(['stop', 'start', 'rm', 'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'cp'])
+  const containerCommands = new Set(['stop', 'start', 'rm', 'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'cp', 'commit', 'top', 'diff', 'port', 'export'])
   if (containerCommands.has(sub)) {
     const lastPart = parts[parts.length - 1]
     // Skip flags
@@ -78,7 +80,7 @@ function getCompletions(
   }
 
   // Complete image names for commands that take images
-  const imageCommands = new Set(['rmi', 'run', 'history', 'tag'])
+  const imageCommands = new Set(['rmi', 'run', 'history', 'tag', 'save'])
   if (imageCommands.has(sub)) {
     const lastPart = parts[parts.length - 1]
     if (lastPart.startsWith('-')) return []
@@ -126,6 +128,8 @@ export function Terminal({ lines, onCommand, containers = [], images = [] }: Ter
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [tabCompletions, setTabCompletions] = useState<string[]>([])
   const [tabIndex, setTabIndex] = useState(-1)
+  const [reverseSearchActive, setReverseSearchActive] = useState(false)
+  const [reverseSearchQuery, setReverseSearchQuery] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -203,10 +207,36 @@ export function Terminal({ lines, onCommand, containers = [], images = [] }: Ter
     } else if (e.key === 'l' && e.ctrlKey) {
       e.preventDefault()
       onCommand('clear')
+    } else if (e.key === 'r' && e.ctrlKey) {
+      e.preventDefault()
+      setReverseSearchActive(true)
+      setReverseSearchQuery('')
     }
   }
 
   const highlightedInput = useMemo(() => highlightCommand(input), [input])
+
+  const reverseSearchMatch = useMemo(() => {
+    if (!reverseSearchActive || !reverseSearchQuery) return null
+    return [...history].reverse().find(cmd =>
+      cmd.toLowerCase().includes(reverseSearchQuery.toLowerCase())
+    ) || null
+  }, [reverseSearchActive, reverseSearchQuery, history])
+
+  const handleReverseSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setReverseSearchActive(false)
+      setReverseSearchQuery('')
+      inputRef.current?.focus()
+    } else if (e.key === 'Enter') {
+      if (reverseSearchMatch) {
+        setInput(reverseSearchMatch)
+      }
+      setReverseSearchActive(false)
+      setReverseSearchQuery('')
+      inputRef.current?.focus()
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-card border border-border rounded-lg overflow-hidden">
@@ -246,6 +276,22 @@ export function Terminal({ lines, onCommand, containers = [], images = [] }: Ter
       </div>
 
       <form onSubmit={handleSubmit} className="border-t border-border p-3 bg-muted/30">
+        {reverseSearchActive && (
+          <div className="flex items-center gap-2 mb-2 text-xs font-mono text-muted-foreground">
+            <span className="text-primary">(reverse-i-search)</span>
+            <Input
+              value={reverseSearchQuery}
+              onChange={(e) => setReverseSearchQuery(e.target.value)}
+              onKeyDown={handleReverseSearchKeyDown}
+              placeholder="type to search history..."
+              className="font-mono text-xs h-7 bg-background/50 border-input"
+              autoFocus
+            />
+            {reverseSearchMatch && (
+              <span className="text-accent truncate max-w-[200px]">{reverseSearchMatch}</span>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2 relative">
           <span className="text-muted-foreground font-mono text-sm select-none">$</span>
           <div className="relative flex-1">
