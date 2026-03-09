@@ -11,9 +11,10 @@ export interface DockerContainer {
   id: string
   name: string
   image: string
-  status: 'running' | 'stopped' | 'exited'
+  status: 'running' | 'stopped' | 'exited' | 'paused'
   ports: string[]
   env: Record<string, string>
+  volumes: string[]
   created: number
   command: string
 }

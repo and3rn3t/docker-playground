@@ -67,6 +67,18 @@ export function parseCommand(
       return handleLogs(parts, state)
     case 'inspect':
       return handleInspect(parts, state)
+    case 'rename':
+      return handleRename(parts, state, updateState)
+    case 'pause':
+      return handlePause(parts, state, updateState)
+    case 'unpause':
+      return handleUnpause(parts, state, updateState)
+    case 'tag':
+      return handleTag(parts, state, updateState)
+    case 'history':
+      return handleHistory(parts, state)
+    case 'system':
+      return handleSystem(parts, state, updateState)
     default:
       return {
         success: false,
@@ -78,22 +90,61 @@ export function parseCommand(
 
 function handlePs(parts: string[], state: DockerState): CommandResult {
   const showAll = parts.includes('-a') || parts.includes('--all')
-  const containers = showAll 
+  const quiet = parts.includes('-q') || parts.includes('--quiet')
+  const noTrunc = parts.includes('--no-trunc')
+
+  // Parse --filter flags
+  const filters: { key: string; value: string }[] = []
+  for (let i = 2; i < parts.length; i++) {
+    if ((parts[i] === '--filter' || parts[i] === '-f') && parts[i + 1]) {
+      const [key, ...rest] = parts[i + 1].split('=')
+      filters.push({ key: key || '', value: rest.join('=') })
+      i++
+    }
+  }
+
+  let containers = showAll 
     ? state.containers 
     : state.containers.filter(c => c.status === 'running')
 
+  // Apply filters
+  for (const filter of filters) {
+    switch (filter.key) {
+      case 'status':
+        containers = containers.filter(c => c.status === filter.value)
+        break
+      case 'name':
+        containers = containers.filter(c => c.name.includes(filter.value))
+        break
+      default:
+        return {
+          success: false,
+          output: '',
+          error: `Invalid filter '${filter.key}'. Supported filters: status, name`
+        }
+    }
+  }
+
   if (containers.length === 0) {
+    if (quiet) {
+      return { success: true, output: '' }
+    }
     return {
       success: true,
       output: 'CONTAINER ID   IMAGE          COMMAND    CREATED        STATUS    PORTS    NAMES\n(no containers)'
     }
   }
 
+  if (quiet) {
+    const ids = containers.map(c => noTrunc ? c.id : c.id.substring(0, 12))
+    return { success: true, output: ids.join('\n') }
+  }
+
   const header = 'CONTAINER ID   IMAGE          COMMAND       CREATED        STATUS         PORTS           NAMES'
   const rows = containers.map(c => {
-    const id = c.id.substring(0, 12)
+    const id = noTrunc ? c.id : c.id.substring(0, 12)
     const created = formatTimestamp(c.created)
-    const status = c.status === 'running' ? 'Up' : 'Exited'
+    const status = c.status === 'running' ? 'Up' : c.status === 'paused' ? 'Paused' : 'Exited'
     const ports = c.ports.join(', ') || '-'
     return `${id.padEnd(15)}${c.image.padEnd(15)}${c.command.padEnd(14)}${created.padEnd(15)}${status.padEnd(15)}${ports.padEnd(16)}${c.name}`
   })
@@ -130,9 +181,10 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
   const nameIndex = parts.indexOf('--name')
   let containerName = nameIndex > -1 ? parts[nameIndex + 1] : undefined
   
-  // Parse flags and collect ports, env vars, and image name
+  // Parse flags and collect ports, env vars, volumes, and image name
   const ports: string[] = []
   const env: Record<string, string> = {}
+  const volumes: string[] = []
   let imageName = ''
 
   for (let i = 2; i < parts.length; i++) {
@@ -158,6 +210,14 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
       } else {
         env[envArg.substring(0, eqIndex)] = envArg.substring(eqIndex + 1)
       }
+      continue
+    }
+    if (part === '-v' || part === '--volume') {
+      const volArg = parts[++i]
+      if (!volArg) {
+        return { success: false, output: '', error: 'docker run: -v requires a volume argument (e.g. -v /host:/container)' }
+      }
+      volumes.push(volArg)
       continue
     }
     if (part?.startsWith('-')) continue
@@ -226,6 +286,7 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
     status: 'running',
     ports,
     env,
+    volumes,
     created: Date.now(),
     command: image.name.includes('nginx') ? 'nginx -g daemon off;' : '/bin/sh'
   }
@@ -242,8 +303,8 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
 }
 
 function handleStop(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
-  const containerRef = parts[2]
-  if (!containerRef) {
+  const refs = parts.slice(2)
+  if (refs.length === 0) {
     return {
       success: false,
       output: '',
@@ -251,39 +312,30 @@ function handleStop(parts: string[], state: DockerState, updateState: (newState:
     }
   }
 
-  const container = findContainer(containerRef, state.containers)
-  if (!container) {
-    return {
-      success: false,
-      output: '',
-      error: `No such container: ${containerRef}`
-    }
-  }
+  const results: string[] = []
+  let updatedContainers = [...state.containers]
 
-  if (container.status !== 'running') {
-    return {
-      success: false,
-      output: '',
-      error: `Container ${containerRef} is not running`
+  for (const ref of refs) {
+    const container = findContainer(ref, updatedContainers)
+    if (!container) {
+      return { success: false, output: '', error: `No such container: ${ref}` }
     }
-  }
-
-  updateState({
-    ...state,
-    containers: state.containers.map(c => 
-      c.id === container.id ? { ...c, status: 'stopped' } : c
+    if (container.status !== 'running' && container.status !== 'paused') {
+      return { success: false, output: '', error: `Container ${ref} is not running` }
+    }
+    updatedContainers = updatedContainers.map(c =>
+      c.id === container.id ? { ...c, status: 'stopped' as const } : c
     )
-  })
-
-  return {
-    success: true,
-    output: containerRef
+    results.push(ref)
   }
+
+  updateState({ ...state, containers: updatedContainers })
+  return { success: true, output: results.join('\n') }
 }
 
 function handleStart(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
-  const containerRef = parts[2]
-  if (!containerRef) {
+  const refs = parts.slice(2)
+  if (refs.length === 0) {
     return {
       success: false,
       output: '',
@@ -291,41 +343,32 @@ function handleStart(parts: string[], state: DockerState, updateState: (newState
     }
   }
 
-  const container = findContainer(containerRef, state.containers)
-  if (!container) {
-    return {
-      success: false,
-      output: '',
-      error: `No such container: ${containerRef}`
-    }
-  }
+  const results: string[] = []
+  let updatedContainers = [...state.containers]
 
-  if (container.status === 'running') {
-    return {
-      success: false,
-      output: '',
-      error: `Container ${containerRef} is already running`
+  for (const ref of refs) {
+    const container = findContainer(ref, updatedContainers)
+    if (!container) {
+      return { success: false, output: '', error: `No such container: ${ref}` }
     }
-  }
-
-  updateState({
-    ...state,
-    containers: state.containers.map(c => 
-      c.id === container.id ? { ...c, status: 'running' } : c
+    if (container.status === 'running') {
+      return { success: false, output: '', error: `Container ${ref} is already running` }
+    }
+    updatedContainers = updatedContainers.map(c =>
+      c.id === container.id ? { ...c, status: 'running' as const } : c
     )
-  })
-
-  return {
-    success: true,
-    output: containerRef
+    results.push(ref)
   }
+
+  updateState({ ...state, containers: updatedContainers })
+  return { success: true, output: results.join('\n') }
 }
 
 function handleRm(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
   const force = parts.includes('-f') || parts.includes('--force')
-  const containerRef = parts.find(p => p !== 'docker' && p !== 'rm' && p !== '-f' && p !== '--force')
+  const refs = parts.filter(p => p !== 'docker' && p !== 'rm' && p !== '-f' && p !== '--force')
   
-  if (!containerRef) {
+  if (refs.length === 0) {
     return {
       success: false,
       output: '',
@@ -333,32 +376,27 @@ function handleRm(parts: string[], state: DockerState, updateState: (newState: D
     }
   }
 
-  const container = findContainer(containerRef, state.containers)
-  if (!container) {
-    return {
-      success: false,
-      output: '',
-      error: `No such container: ${containerRef}`
+  const results: string[] = []
+  let updatedContainers = [...state.containers]
+
+  for (const ref of refs) {
+    const container = findContainer(ref, updatedContainers)
+    if (!container) {
+      return { success: false, output: '', error: `No such container: ${ref}` }
     }
-  }
-
-  if (container.status === 'running' && !force) {
-    return {
-      success: false,
-      output: '',
-      error: `Cannot remove running container ${containerRef}. Stop it first or use -f flag.`
+    if (container.status === 'running' && !force) {
+      return {
+        success: false,
+        output: '',
+        error: `Cannot remove running container ${ref}. Stop it first or use -f flag.`
+      }
     }
+    updatedContainers = updatedContainers.filter(c => c.id !== container.id)
+    results.push(ref)
   }
 
-  updateState({
-    ...state,
-    containers: state.containers.filter(c => c.id !== container.id)
-  })
-
-  return {
-    success: true,
-    output: containerRef
-  }
+  updateState({ ...state, containers: updatedContainers })
+  return { success: true, output: results.join('\n') }
 }
 
 function handleRmi(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
@@ -528,7 +566,8 @@ function handleInspect(parts: string[], state: DockerState): CommandResult {
         },
         Created: new Date(container.created).toISOString(),
         Ports: container.ports,
-        Env: container.env
+        Env: container.env,
+        Volumes: container.volumes
       }, null, 2)
     }
   }
@@ -556,6 +595,163 @@ function handleInspect(parts: string[], state: DockerState): CommandResult {
     success: false,
     output: '',
     error: `No such object: ${ref}`
+  }
+}
+
+function handleRename(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const oldName = parts[2]
+  const newName = parts[3]
+  if (!oldName || !newName) {
+    return { success: false, output: '', error: 'docker rename: requires CONTAINER NEW_NAME' }
+  }
+
+  const container = findContainer(oldName, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${oldName}` }
+  }
+
+  if (state.containers.find(c => c.name === newName)) {
+    return { success: false, output: '', error: `Container name '${newName}' is already in use.` }
+  }
+
+  updateState({
+    ...state,
+    containers: state.containers.map(c =>
+      c.id === container.id ? { ...c, name: newName } : c
+    )
+  })
+
+  return { success: true, output: '' }
+}
+
+function handlePause(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const ref = parts[2]
+  if (!ref) {
+    return { success: false, output: '', error: 'docker pause: container name or ID required' }
+  }
+
+  const container = findContainer(ref, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${ref}` }
+  }
+
+  if (container.status !== 'running') {
+    return { success: false, output: '', error: `Container ${ref} is not running` }
+  }
+
+  updateState({
+    ...state,
+    containers: state.containers.map(c =>
+      c.id === container.id ? { ...c, status: 'paused' as const } : c
+    )
+  })
+
+  return { success: true, output: ref }
+}
+
+function handleUnpause(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const ref = parts[2]
+  if (!ref) {
+    return { success: false, output: '', error: 'docker unpause: container name or ID required' }
+  }
+
+  const container = findContainer(ref, state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${ref}` }
+  }
+
+  if (container.status !== 'paused') {
+    return { success: false, output: '', error: `Container ${ref} is not paused` }
+  }
+
+  updateState({
+    ...state,
+    containers: state.containers.map(c =>
+      c.id === container.id ? { ...c, status: 'running' as const } : c
+    )
+  })
+
+  return { success: true, output: ref }
+}
+
+function handleTag(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const sourceRef = parts[2]
+  const targetRef = parts[3]
+  if (!sourceRef || !targetRef) {
+    return { success: false, output: '', error: 'docker tag: requires SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]' }
+  }
+
+  const sourceImage = state.images.find(img =>
+    `${img.name}:${img.tag}` === sourceRef || img.name === sourceRef || img.id.startsWith(sourceRef)
+  )
+  if (!sourceImage) {
+    return { success: false, output: '', error: `No such image: ${sourceRef}` }
+  }
+
+  const [targetName, targetTag = 'latest'] = targetRef.split(':')
+  if (state.images.find(img => img.name === targetName && img.tag === targetTag)) {
+    return { success: false, output: '', error: `Image ${targetName}:${targetTag} already exists` }
+  }
+
+  const taggedImage: DockerImage = {
+    id: generateId(),
+    name: targetName || '',
+    tag: targetTag,
+    size: sourceImage.size,
+    created: Date.now(),
+    layers: [...sourceImage.layers]
+  }
+
+  updateState({ ...state, images: [...state.images, taggedImage] })
+  return { success: true, output: '' }
+}
+
+function handleHistory(parts: string[], state: DockerState): CommandResult {
+  const imageRef = parts[2]
+  if (!imageRef) {
+    return { success: false, output: '', error: 'docker history: image name or ID required' }
+  }
+
+  const image = state.images.find(img =>
+    `${img.name}:${img.tag}` === imageRef || img.name === imageRef || img.id.startsWith(imageRef)
+  )
+  if (!image) {
+    return { success: false, output: '', error: `No such image: ${imageRef}` }
+  }
+
+  const header = 'IMAGE          CREATED        CREATED BY                          SIZE'
+  const rows = image.layers.map((layer, i) => {
+    const created = formatTimestamp(image.created)
+    const cmd = i === 0 ? `FROM ${image.name}:${image.tag}` : `RUN step ${i}`
+    const size = i === 0 ? image.size : `${Math.floor(Math.random() * 50) + 1}MB`
+    return `${layer.padEnd(15)}${created.padEnd(15)}${cmd.padEnd(36)}${size}`
+  })
+
+  return { success: true, output: [header, ...rows].join('\n') }
+}
+
+function handleSystem(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const action = parts[2]
+  if (action !== 'prune') {
+    return { success: false, output: '', error: `docker system: unknown command '${action || ''}'. Available: prune` }
+  }
+
+  const stoppedContainers = state.containers.filter(c => c.status !== 'running' && c.status !== 'paused')
+  const survivingContainers = state.containers.filter(c => c.status === 'running' || c.status === 'paused')
+  const usedImageNames = new Set(survivingContainers.map(c => c.image))
+  const unusedImages = state.images.filter(img => !usedImageNames.has(`${img.name}:${img.tag}`))
+
+  const removedContainers = stoppedContainers.length
+  const removedImages = unusedImages.length
+
+  updateState({
+    containers: survivingContainers,
+    images: state.images.filter(img => usedImageNames.has(`${img.name}:${img.tag}`))
+  })
+
+  return {
+    success: true,
+    output: `Deleted ${removedContainers} stopped container(s)\nDeleted ${removedImages} unused image(s)\nTotal reclaimed space: ${removedContainers * 50 + removedImages * 100}MB`
   }
 }
 
@@ -604,20 +800,31 @@ function getHelpText(): string {
   return `Docker Playground - Available Commands:
 
 Container Commands:
-  docker ps [-a]              List running containers (-a shows all)
+  docker ps [OPTIONS]         List containers (default: running only)
+    Options: -a (all), -q (IDs only), --no-trunc, --filter key=value
+    Filters: status=running|stopped|exited|paused, name=PATTERN
   docker run [OPTIONS] IMAGE  Create and start a container
-    Options: -d (detached), --name NAME, -p HOST:CONTAINER, -e KEY=VALUE
-  docker stop CONTAINER       Stop a running container
-  docker start CONTAINER      Start a stopped container
-  docker rm [-f] CONTAINER    Remove a container (-f forces removal)
+    Options: -d (detached), --name NAME, -p HOST:CONTAINER,
+             -e KEY=VALUE, -v HOST:CONTAINER
+  docker stop CONTAINER...    Stop one or more running containers
+  docker start CONTAINER...   Start one or more stopped containers
+  docker rm [-f] CONTAINER... Remove one or more containers (-f forces)
   docker exec CONTAINER CMD   Execute command in running container
   docker logs CONTAINER       View container logs
+  docker rename OLD NEW       Rename a container
+  docker pause CONTAINER      Pause a running container
+  docker unpause CONTAINER    Resume a paused container
 
 Image Commands:
   docker images               List all images
   docker pull IMAGE[:TAG]     Pull an image (creates simulated image)
   docker rmi IMAGE            Remove an image
+  docker tag SOURCE TARGET    Create a tag TARGET from SOURCE image
+  docker history IMAGE        Show image layer history
+
+Inspect & System:
   docker inspect NAME/ID      Show detailed information
+  docker system prune         Remove stopped containers and unused images
 
 Other:
   help                        Show this help message
@@ -625,10 +832,13 @@ Other:
 
 Examples:
   docker pull nginx:latest
-  docker run -d --name web nginx:latest
-  docker ps
-  docker stop web
-  docker rm web`
+  docker run -d --name web -p 8080:80 nginx
+  docker run -e NODE_ENV=production -v ./data:/data node:20-alpine
+  docker ps --filter status=running
+  docker stop web db
+  docker rm web db
+  docker tag nginx myregistry/nginx:v1
+  docker system prune`
 }
 
 export function getInitialImages(): DockerImage[] {

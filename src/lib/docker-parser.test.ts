@@ -17,6 +17,7 @@ function makeContainer(overrides?: Partial<DockerContainer>): DockerContainer {
     status: 'running',
     ports: [],
     env: {},
+    volumes: [],
     created: Date.now(),
     command: 'nginx -g daemon off;',
     ...overrides,
@@ -594,6 +595,333 @@ describe('parseCommand', () => {
       expect(result.success).toBe(true)
       const parsed = JSON.parse(result.output)
       expect(parsed.Env).toEqual({ NODE_ENV: 'production' })
+    })
+  })
+
+  describe('docker rename', () => {
+    it('renames a container', () => {
+      const container = makeContainer({ name: 'old-name' })
+      const state = makeState({ containers: [container] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker rename old-name new-name', state, updateState)
+      expect(result.success).toBe(true)
+      expect(updateState.mock.calls[0][0].containers[0].name).toBe('new-name')
+    })
+
+    it('rejects rename to an existing name', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web' })
+      const c2 = makeContainer({ id: 'bbb', name: 'api' })
+      const state = makeState({ containers: [c1, c2] })
+
+      const result = parseCommand('docker rename web api', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already in use')
+    })
+
+    it('rejects rename of non-existent container', () => {
+      const result = parseCommand('docker rename ghost new', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('requires both old and new names', () => {
+      const result = parseCommand('docker rename web', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('requires')
+    })
+  })
+
+  describe('docker pause/unpause', () => {
+    it('pauses a running container', () => {
+      const container = makeContainer({ name: 'web', status: 'running' })
+      const state = makeState({ containers: [container] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker pause web', state, updateState)
+      expect(result.success).toBe(true)
+      expect(updateState.mock.calls[0][0].containers[0].status).toBe('paused')
+    })
+
+    it('rejects pausing a stopped container', () => {
+      const container = makeContainer({ name: 'web', status: 'stopped' })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker pause web', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('not running')
+    })
+
+    it('unpauses a paused container', () => {
+      const container = makeContainer({ name: 'web', status: 'paused' })
+      const state = makeState({ containers: [container] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker unpause web', state, updateState)
+      expect(result.success).toBe(true)
+      expect(updateState.mock.calls[0][0].containers[0].status).toBe('running')
+    })
+
+    it('rejects unpausing a non-paused container', () => {
+      const container = makeContainer({ name: 'web', status: 'running' })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker unpause web', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('not paused')
+    })
+
+    it('requires container ref for pause', () => {
+      const result = parseCommand('docker pause', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+
+    it('requires container ref for unpause', () => {
+      const result = parseCommand('docker unpause', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('multi-container stop/start/rm', () => {
+    it('stops multiple containers', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web', status: 'running' })
+      const c2 = makeContainer({ id: 'bbb', name: 'api', status: 'running' })
+      const state = makeState({ containers: [c1, c2] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker stop web api', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('web\napi')
+      const updated = updateState.mock.calls[0][0].containers
+      expect(updated.every((c: DockerContainer) => c.status === 'stopped')).toBe(true)
+    })
+
+    it('starts multiple containers', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web', status: 'stopped' })
+      const c2 = makeContainer({ id: 'bbb', name: 'api', status: 'stopped' })
+      const state = makeState({ containers: [c1, c2] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker start web api', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('web\napi')
+    })
+
+    it('removes multiple stopped containers', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web', status: 'stopped' })
+      const c2 = makeContainer({ id: 'bbb', name: 'api', status: 'stopped' })
+      const state = makeState({ containers: [c1, c2] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker rm web api', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('web\napi')
+      expect(updateState.mock.calls[0][0].containers).toHaveLength(0)
+    })
+
+    it('fails early on non-existent container in multi-stop', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web', status: 'running' })
+      const state = makeState({ containers: [c1] })
+
+      const result = parseCommand('docker stop web ghost', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('ghost')
+    })
+  })
+
+  describe('docker ps filters', () => {
+    it('filters by status=stopped', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web', status: 'running' })
+      const c2 = makeContainer({ id: 'bbb', name: 'api', status: 'stopped' })
+      const state = makeState({ containers: [c1, c2] })
+
+      const result = parseCommand('docker ps -a --filter status=stopped', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('api')
+      expect(result.output).not.toContain('web')
+    })
+
+    it('filters by name', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web-server', status: 'running' })
+      const c2 = makeContainer({ id: 'bbb', name: 'api', status: 'running' })
+      const state = makeState({ containers: [c1, c2] })
+
+      const result = parseCommand('docker ps --filter name=web', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('web-server')
+      expect(result.output).not.toContain('api')
+    })
+
+    it('rejects unknown filter', () => {
+      const result = parseCommand('docker ps --filter image=nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid filter')
+    })
+
+    it('returns only IDs with -q', () => {
+      const c1 = makeContainer({ id: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc12345', name: 'web', status: 'running' })
+      const state = makeState({ containers: [c1] })
+
+      const result = parseCommand('docker ps -q', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('abc123def456')
+    })
+
+    it('returns full IDs with -q --no-trunc', () => {
+      const c1 = makeContainer({ id: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc12345', name: 'web', status: 'running' })
+      const state = makeState({ containers: [c1] })
+
+      const result = parseCommand('docker ps -q --no-trunc', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('abc123def456abc123def456abc123def456abc123def456abc123def456abc12345')
+    })
+  })
+
+  describe('docker tag', () => {
+    it('creates a tagged copy of an image', () => {
+      const state = makeState()
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker tag nginx myrepo/nginx:v1', state, updateState)
+      expect(result.success).toBe(true)
+      const images = updateState.mock.calls[0][0].images
+      const tagged = images.find((i: DockerImage) => i.name === 'myrepo/nginx' && i.tag === 'v1')
+      expect(tagged).toBeDefined()
+      expect(tagged.layers).toEqual(state.images.find(i => i.name === 'nginx')!.layers)
+    })
+
+    it('defaults target tag to latest', () => {
+      const state = makeState()
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker tag nginx myrepo/nginx', state, updateState)
+      expect(result.success).toBe(true)
+      const images = updateState.mock.calls[0][0].images
+      expect(images.find((i: DockerImage) => i.name === 'myrepo/nginx' && i.tag === 'latest')).toBeDefined()
+    })
+
+    it('rejects tagging non-existent source', () => {
+      const result = parseCommand('docker tag ghost myrepo/ghost', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such image')
+    })
+
+    it('rejects duplicate target', () => {
+      const result = parseCommand('docker tag nginx nginx:latest', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already exists')
+    })
+
+    it('requires both source and target', () => {
+      const result = parseCommand('docker tag nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('requires')
+    })
+  })
+
+  describe('docker history', () => {
+    it('shows history for an image', () => {
+      const state = makeState()
+
+      const result = parseCommand('docker history nginx', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('IMAGE')
+      expect(result.output).toContain('CREATED BY')
+      expect(result.output).toContain('FROM nginx:latest')
+    })
+
+    it('rejects non-existent image', () => {
+      const result = parseCommand('docker history ghost', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such image')
+    })
+
+    it('requires image name', () => {
+      const result = parseCommand('docker history', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker system prune', () => {
+    it('removes stopped containers and unused images', () => {
+      const c1 = makeContainer({ id: 'aaa', name: 'web', status: 'running', image: 'nginx:latest' })
+      const c2 = makeContainer({ id: 'bbb', name: 'old', status: 'stopped', image: 'node:20-alpine' })
+      const images = [
+        makeImage({ name: 'nginx', tag: 'latest' }),
+        makeImage({ name: 'node', tag: '20-alpine' }),
+        makeImage({ name: 'unused', tag: 'latest' }),
+      ]
+      const state = makeState({ containers: [c1, c2], images })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker system prune', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('1 stopped container')
+      expect(result.output).toContain('2 unused image')
+      const newState = updateState.mock.calls[0][0]
+      expect(newState.containers).toHaveLength(1)
+      expect(newState.containers[0].name).toBe('web')
+      expect(newState.images).toHaveLength(1)
+      expect(newState.images[0].name).toBe('nginx')
+    })
+
+    it('rejects unknown system subcommand', () => {
+      const result = parseCommand('docker system info', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('unknown command')
+    })
+  })
+
+  describe('docker run with volumes', () => {
+    it('parses -v volume flag', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -v /data:/app/data nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.volumes).toEqual(['/data:/app/data'])
+    })
+
+    it('parses multiple -v flags', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -v /data:/data -v /logs:/logs nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.volumes).toEqual(['/data:/data', '/logs:/logs'])
+    })
+
+    it('container has empty volumes when no -v flags', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.volumes).toEqual([])
+    })
+  })
+
+  describe('docker stop with paused container', () => {
+    it('stops a paused container', () => {
+      const container = makeContainer({ name: 'web', status: 'paused' })
+      const state = makeState({ containers: [container] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker stop web', state, updateState)
+      expect(result.success).toBe(true)
+      expect(updateState.mock.calls[0][0].containers[0].status).toBe('stopped')
+    })
+  })
+
+  describe('docker inspect with volumes', () => {
+    it('includes volumes in inspect output', () => {
+      const container = makeContainer({ name: 'web', volumes: ['/data:/app/data'] })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker inspect web', state, noopUpdate)
+      expect(result.success).toBe(true)
+      const parsed = JSON.parse(result.output)
+      expect(parsed.Volumes).toEqual(['/data:/app/data'])
     })
   })
 })

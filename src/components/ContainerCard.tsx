@@ -2,7 +2,7 @@ import { DockerContainer } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Play, Stop, Trash } from '@phosphor-icons/react'
+import { Play, Stop, Trash, Pause } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -15,6 +15,7 @@ interface ContainerCardProps {
 
 export function ContainerCard({ container, onStop, onStart, onRemove }: ContainerCardProps) {
   const isRunning = container.status === 'running'
+  const isPaused = container.status === 'paused'
 
   return (
     <motion.div
@@ -24,14 +25,22 @@ export function ContainerCard({ container, onStop, onStart, onRemove }: Containe
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.3, type: 'spring', bounce: 0.2 }}
     >
-      <Card className={`p-4 border-2 transition-all ${isRunning ? 'border-accent/50 glow-accent' : 'border-border'}`}>
+      <Card
+        className={`p-4 border-2 transition-all ${isRunning || isPaused ? 'border-accent/50 glow-accent' : 'border-border'}`}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-semibold text-lg truncate">{container.name}</h3>
-              <Badge 
-                variant={isRunning ? 'default' : 'secondary'}
-                className={isRunning ? 'bg-accent text-accent-foreground' : ''}
+              <Badge
+                variant={isRunning || isPaused ? 'default' : 'secondary'}
+                className={
+                  isRunning
+                    ? 'bg-accent text-accent-foreground'
+                    : isPaused
+                      ? 'bg-yellow-600 text-white'
+                      : ''
+                }
               >
                 {container.status}
               </Badge>
@@ -55,8 +64,16 @@ export function ContainerCard({ container, onStop, onStart, onRemove }: Containe
                 <div className="flex items-center gap-2">
                   <span className="text-primary">Env:</span>
                   <span className="truncate">
-                    {Object.entries(container.env).map(([k, v]) => `${k}=${v}`).join(', ')}
+                    {Object.entries(container.env)
+                      .map(([k, v]) => `${k}=${v}`)
+                      .join(', ')}
                   </span>
+                </div>
+              )}
+              {container.volumes && container.volumes.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-primary">Volumes:</span>
+                  <span className="truncate">{container.volumes.join(', ')}</span>
                 </div>
               )}
             </div>
@@ -64,7 +81,7 @@ export function ContainerCard({ container, onStop, onStart, onRemove }: Containe
 
           <div className="flex items-center gap-1">
             <TooltipProvider>
-              {isRunning ? (
+              {isRunning || isPaused ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
