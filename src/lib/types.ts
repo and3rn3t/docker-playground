@@ -17,6 +17,23 @@ export interface DockerContainer {
   volumes: string[]
   created: number
   command: string
+  networks: string[]
+}
+
+export interface DockerNetwork {
+  id: string
+  name: string
+  driver: string
+  containers: string[] // container IDs
+  created: number
+}
+
+export interface DockerVolume {
+  id: string
+  name: string
+  driver: string
+  mountpoint: string
+  created: number
 }
 
 export interface TerminalLine {

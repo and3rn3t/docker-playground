@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
-import { parseCommand, DockerState, getInitialImages } from './docker-parser'
-import { DockerContainer, DockerImage } from './types'
+import { parseCommand, DockerState, getInitialImages, getInitialNetworks } from './docker-parser'
+import { DockerContainer, DockerImage, DockerNetwork, DockerVolume } from './types'
 
 function makeState(overrides?: Partial<DockerState>): DockerState {
   return {
     containers: overrides?.containers ?? [],
     images: overrides?.images ?? getInitialImages(),
+    networks: overrides?.networks ?? getInitialNetworks(),
+    volumes: overrides?.volumes ?? [],
   }
 }
 
@@ -20,6 +22,7 @@ function makeContainer(overrides?: Partial<DockerContainer>): DockerContainer {
     volumes: [],
     created: Date.now(),
     command: 'nginx -g daemon off;',
+    networks: ['bridge'],
     ...overrides,
   }
 }
@@ -932,6 +935,210 @@ describe('parseCommand', () => {
       expect(result.success).toBe(true)
       const parsed = JSON.parse(result.output)
       expect(parsed.Volumes).toEqual(['/data:/app/data'])
+    })
+  })
+
+  describe('docker network', () => {
+    it('lists default networks', () => {
+      const result = parseCommand('docker network ls', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('bridge')
+      expect(result.output).toContain('host')
+    })
+
+    it('creates a new network', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker network create my-net', makeState(), updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toHaveLength(64)
+      const newState = updateState.mock.calls[0][0] as DockerState
+      expect(newState.networks.find(n => n.name === 'my-net')).toBeDefined()
+    })
+
+    it('rejects duplicate network name', () => {
+      const result = parseCommand('docker network create bridge', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already exists')
+    })
+
+    it('removes a network', () => {
+      const updateState = vi.fn()
+      const state = makeState()
+      // bridge has no active containers by default
+      const result = parseCommand('docker network rm bridge', state, updateState)
+      expect(result.success).toBe(true)
+      const newState = updateState.mock.calls[0][0] as DockerState
+      expect(newState.networks.find(n => n.name === 'bridge')).toBeUndefined()
+    })
+
+    it('rejects removing network with active containers', () => {
+      const network: DockerNetwork = { id: 'net1', name: 'app-net', driver: 'bridge', containers: ['abc123'], created: Date.now() }
+      const state = makeState({ networks: [network] })
+      const result = parseCommand('docker network rm app-net', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('active endpoints')
+    })
+
+    it('connects a container to a network', () => {
+      const container = makeContainer({ name: 'web', status: 'running' })
+      const network: DockerNetwork = { id: 'net1', name: 'app-net', driver: 'bridge', containers: [], created: Date.now() }
+      const state = makeState({ containers: [container], networks: [network] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker network connect app-net web', state, updateState)
+      expect(result.success).toBe(true)
+      const newState = updateState.mock.calls[0][0] as DockerState
+      expect(newState.networks[0].containers).toContain(container.id)
+      expect(newState.containers[0].networks).toContain('app-net')
+    })
+
+    it('disconnects a container from a network', () => {
+      const container = makeContainer({ name: 'web', status: 'running', networks: ['app-net'] })
+      const network: DockerNetwork = { id: 'net1', name: 'app-net', driver: 'bridge', containers: [container.id], created: Date.now() }
+      const state = makeState({ containers: [container], networks: [network] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker network disconnect app-net web', state, updateState)
+      expect(result.success).toBe(true)
+      const newState = updateState.mock.calls[0][0] as DockerState
+      expect(newState.networks[0].containers).not.toContain(container.id)
+      expect(newState.containers[0].networks).not.toContain('app-net')
+    })
+
+    it('rejects connecting to non-existent network', () => {
+      const container = makeContainer({ name: 'web' })
+      const state = makeState({ containers: [container] })
+      const result = parseCommand('docker network connect ghost web', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such network')
+    })
+
+    it('requires subcommand', () => {
+      const result = parseCommand('docker network', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('subcommand required')
+    })
+
+    it('rejects unknown subcommand', () => {
+      const result = parseCommand('docker network inspect', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('unknown command')
+    })
+  })
+
+  describe('docker volume', () => {
+    it('lists volumes', () => {
+      const result = parseCommand('docker volume ls', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('DRIVER')
+      expect(result.output).toContain('no volumes')
+    })
+
+    it('creates a volume', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker volume create my-data', makeState(), updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('my-data')
+      const newState = updateState.mock.calls[0][0] as DockerState
+      expect(newState.volumes.find(v => v.name === 'my-data')).toBeDefined()
+    })
+
+    it('rejects duplicate volume name', () => {
+      const vol: DockerVolume = { id: 'vol1', name: 'my-data', driver: 'local', mountpoint: '/var/lib/docker/volumes/my-data/_data', created: Date.now() }
+      const state = makeState({ volumes: [vol] })
+      const result = parseCommand('docker volume create my-data', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already exists')
+    })
+
+    it('removes a volume', () => {
+      const vol: DockerVolume = { id: 'vol1', name: 'my-data', driver: 'local', mountpoint: '/var/lib/docker/volumes/my-data/_data', created: Date.now() }
+      const state = makeState({ volumes: [vol] })
+      const updateState = vi.fn()
+
+      const result = parseCommand('docker volume rm my-data', state, updateState)
+      expect(result.success).toBe(true)
+      const newState = updateState.mock.calls[0][0] as DockerState
+      expect(newState.volumes).toHaveLength(0)
+    })
+
+    it('rejects removing non-existent volume', () => {
+      const result = parseCommand('docker volume rm ghost', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such volume')
+    })
+
+    it('requires subcommand', () => {
+      const result = parseCommand('docker volume', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('subcommand required')
+    })
+  })
+
+  describe('docker cp', () => {
+    it('copies from container to host', () => {
+      const container = makeContainer({ name: 'web', status: 'running' })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker cp web:/etc/nginx.conf ./nginx.conf', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Successfully copied')
+      expect(result.output).toContain('from')
+    })
+
+    it('copies from host to container', () => {
+      const container = makeContainer({ name: 'web', status: 'running' })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker cp ./nginx.conf web:/etc/nginx.conf', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Successfully copied')
+      expect(result.output).toContain('to')
+    })
+
+    it('rejects cp with non-existent container', () => {
+      const result = parseCommand('docker cp ghost:/file ./file', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('rejects cp with stopped container', () => {
+      const container = makeContainer({ name: 'web', status: 'stopped' })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker cp web:/file ./file', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('not running')
+    })
+
+    it('rejects cp without container reference', () => {
+      const result = parseCommand('docker cp ./file1 ./file2', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('container path')
+    })
+
+    it('requires both source and dest', () => {
+      const result = parseCommand('docker cp ./file', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('requires')
+    })
+  })
+
+  describe('docker run with --network', () => {
+    it('assigns network to container', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -d --name web --network my-net nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.networks).toEqual(['my-net'])
+    })
+
+    it('defaults to bridge network when --network not specified', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -d --name web nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.networks).toEqual(['bridge'])
     })
   })
 })

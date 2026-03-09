@@ -1,19 +1,93 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Terminal as TerminalIcon } from '@phosphor-icons/react'
-import { TerminalLine } from '@/lib/types'
+import { TerminalLine, DockerContainer, DockerImage } from '@/lib/types'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface TerminalProps {
   lines: TerminalLine[]
   onCommand: (command: string) => void
+  containers?: DockerContainer[]
+  images?: DockerImage[]
 }
 
 const DOCKER_SUBCOMMANDS = new Set([
   'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
   'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
-  'history', 'system', 'prune'
+  'history', 'system', 'prune', 'network', 'volume', 'cp'
 ])
+
+const COMPLETABLE_SUBCOMMANDS = [
+  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
+  'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
+  'history', 'system', 'network', 'volume', 'cp'
+]
+
+const NETWORK_SUBCOMMANDS = ['create', 'ls', 'rm', 'connect', 'disconnect']
+const VOLUME_SUBCOMMANDS = ['create', 'ls', 'rm']
+const SYSTEM_SUBCOMMANDS = ['prune']
+
+function getCompletions(
+  input: string,
+  containers: DockerContainer[],
+  images: DockerImage[]
+): string[] {
+  const parts = input.trimStart().split(/\s+/)
+
+  // Complete top-level: "" or partial first word
+  if (parts.length <= 1) {
+    const partial = parts[0] || ''
+    const options = ['docker', 'help', 'clear']
+    return options.filter(o => o.startsWith(partial) && o !== partial)
+  }
+
+  // After "docker", complete subcommand
+  if (parts[0] === 'docker' && parts.length === 2) {
+    const partial = parts[1]
+    return COMPLETABLE_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
+  }
+
+  const sub = parts[1]
+
+  // "docker network <sub>"
+  if (sub === 'network' && parts.length === 3) {
+    const partial = parts[2]
+    return NETWORK_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
+  }
+
+  // "docker volume <sub>"
+  if (sub === 'volume' && parts.length === 3) {
+    const partial = parts[2]
+    return VOLUME_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
+  }
+
+  // "docker system <sub>"
+  if (sub === 'system' && parts.length === 3) {
+    const partial = parts[2]
+    return SYSTEM_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
+  }
+
+  // Complete container names for commands that take containers
+  const containerCommands = new Set(['stop', 'start', 'rm', 'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'cp'])
+  if (containerCommands.has(sub)) {
+    const lastPart = parts[parts.length - 1]
+    // Skip flags
+    if (lastPart.startsWith('-')) return []
+    const names = containers.map(c => c.name)
+    return names.filter(n => n.startsWith(lastPart) && n !== lastPart)
+  }
+
+  // Complete image names for commands that take images
+  const imageCommands = new Set(['rmi', 'run', 'history', 'tag'])
+  if (imageCommands.has(sub)) {
+    const lastPart = parts[parts.length - 1]
+    if (lastPart.startsWith('-')) return []
+    const imageRefs = images.map(i => `${i.name}:${i.tag}`)
+    return imageRefs.filter(r => r.startsWith(lastPart) && r !== lastPart)
+  }
+
+  return []
+}
 
 function highlightCommand(text: string): React.ReactNode {
   const parts = text.split(/(\s+)/)
@@ -46,10 +120,12 @@ function highlightCommand(text: string): React.ReactNode {
   return <>{nodes}</>
 }
 
-export function Terminal({ lines, onCommand }: TerminalProps) {
+export function Terminal({ lines, onCommand, containers = [], images = [] }: TerminalProps) {
   const [input, setInput] = useState('')
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
+  const [tabCompletions, setTabCompletions] = useState<string[]>([])
+  const [tabIndex, setTabIndex] = useState(-1)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -59,17 +135,54 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
     }
   }, [lines])
 
+  // Reset tab state when input changes via typing
+  const handleInputChange = useCallback((value: string) => {
+    setInput(value)
+    setTabCompletions([])
+    setTabIndex(-1)
+  }, [])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
 
     setHistory(prev => [...prev, input])
     setHistoryIndex(-1)
+    setTabCompletions([])
+    setTabIndex(-1)
     onCommand(input)
     setInput('')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const completions = tabCompletions.length > 0
+        ? tabCompletions
+        : getCompletions(input, containers, images)
+
+      if (completions.length === 0) return
+
+      if (tabCompletions.length === 0) {
+        setTabCompletions(completions)
+      }
+
+      const nextIndex = (tabIndex + 1) % completions.length
+      setTabIndex(nextIndex)
+
+      // Replace the last partial token with the completion
+      const parts = input.trimStart().split(/\s+/)
+      parts[parts.length - 1] = completions[nextIndex]
+      setInput(parts.join(' ') + ' ')
+      return
+    }
+
+    // Any non-tab key resets tab state
+    if (e.key !== 'Tab') {
+      setTabCompletions([])
+      setTabIndex(-1)
+    }
+
     if (e.key === 'ArrowUp') {
       e.preventDefault()
       if (history.length === 0) return
@@ -87,6 +200,9 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
         setHistoryIndex(newIndex)
         setInput(history[newIndex] || '')
       }
+    } else if (e.key === 'l' && e.ctrlKey) {
+      e.preventDefault()
+      onCommand('clear')
     }
   }
 
@@ -144,7 +260,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
               id="terminal-input"
               aria-label="Docker terminal input"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="docker ps"
               className="font-mono text-sm bg-background/50 border-input focus-visible:ring-primary text-transparent caret-foreground"

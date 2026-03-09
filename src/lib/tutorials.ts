@@ -565,6 +565,107 @@ export const tutorials: Tutorial[] = [
         successMessage: 'Excellent! You\'ve learned to keep Docker environments clean — a critical production skill!'
       }
     ]
+  },
+  {
+    id: 'docker-networking',
+    title: 'Docker Networking',
+    description: 'Learn to create networks, connect containers, and enable inter-service communication.',
+    difficulty: 'advanced',
+    estimatedTime: '12 min',
+    icon: 'graph',
+    steps: [
+      {
+        id: 'list-networks',
+        title: 'List default networks',
+        description: 'Docker comes with built-in networks. Let\'s see them.',
+        expectedCommand: ['docker network ls'],
+        hints: [
+          'Use docker network ls to list all networks',
+          'Try: docker network ls'
+        ],
+        successMessage: 'You can see the default bridge, host, and none networks. Containers use "bridge" by default.'
+      },
+      {
+        id: 'create-network',
+        title: 'Create a custom network',
+        description: 'Custom networks enable DNS-based service discovery between containers.',
+        expectedCommand: ['docker network create app-net'],
+        hints: [
+          'Use docker network create followed by a name',
+          'Try: docker network create app-net'
+        ],
+        validation: (_state) => {
+          // Check against containers/images since that's what validation receives
+          // The network creation is verified through the command match
+          return true
+        },
+        successMessage: 'Custom network created! Containers on the same custom network can reach each other by name.'
+      },
+      {
+        id: 'run-on-network',
+        title: 'Run a container on the network',
+        description: 'Launch an nginx container attached to your custom network.',
+        expectedCommand: ['docker run -d --name web --network app-net nginx:latest', 'docker run -d --name web --network app-net nginx'],
+        hints: [
+          'Use --network to attach a container to a specific network at run time',
+          'Try: docker run -d --name web --network app-net nginx:latest'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'web' && c.status === 'running')
+        },
+        successMessage: 'Container is running on your custom network!'
+      },
+      {
+        id: 'run-second-container',
+        title: 'Add a second container',
+        description: 'Add a redis container to the same network so the services can communicate.',
+        expectedCommand: ['docker run -d --name cache --network app-net redis:alpine', 'docker run -d --name cache --network app-net redis'],
+        hints: [
+          'Run redis on the same app-net network',
+          'Try: docker run -d --name cache --network app-net redis:alpine'
+        ],
+        validation: (state) => {
+          return state.containers.filter(c => c.status === 'running').length >= 2
+        },
+        successMessage: 'Both containers share the same network and can communicate using their names (e.g., ping web from cache).'
+      },
+      {
+        id: 'connect-existing',
+        title: 'Connect a container to another network',
+        description: 'Containers can belong to multiple networks. Let\'s connect web to the default bridge too.',
+        expectedCommand: ['docker network connect bridge web'],
+        hints: [
+          'Use docker network connect NETWORK CONTAINER',
+          'Try: docker network connect bridge web'
+        ],
+        successMessage: 'A container can be on multiple networks — useful for gateway patterns between isolated services.'
+      },
+      {
+        id: 'disconnect-container',
+        title: 'Disconnect from a network',
+        description: 'Remove the web container from the bridge network.',
+        expectedCommand: ['docker network disconnect bridge web'],
+        hints: [
+          'Use docker network disconnect NETWORK CONTAINER',
+          'Try: docker network disconnect bridge web'
+        ],
+        successMessage: 'Disconnected! Network segmentation is key to secure microservice architectures.'
+      },
+      {
+        id: 'cleanup-networking',
+        title: 'Clean up',
+        description: 'Stop and remove the containers, then remove the custom network.',
+        expectedCommand: ['docker stop web', 'docker stop cache', 'docker rm web', 'docker rm cache', 'docker network rm app-net'],
+        hints: [
+          'Stop both containers, remove them, then remove the network',
+          'Try: docker stop web, docker stop cache, then docker rm web, docker rm cache, docker network rm app-net'
+        ],
+        validation: (state) => {
+          return state.containers.length === 0
+        },
+        successMessage: 'Excellent! You\'ve mastered Docker networking — networks isolate services and enable secure communication between containers.'
+      }
+    ]
   }
 ]
 

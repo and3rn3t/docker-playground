@@ -170,7 +170,7 @@ function App() {
                 />
               )}
               <div className="h-[400px] sm:h-[500px] lg:h-[600px]">
-                <Terminal lines={terminalLines} onCommand={handleCommand} />
+                <Terminal lines={terminalLines} onCommand={handleCommand} containers={currentContainers} images={currentImages} />
               </div>
             </div>
 

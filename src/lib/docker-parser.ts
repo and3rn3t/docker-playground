@@ -1,8 +1,10 @@
-import { DockerContainer, DockerImage, CommandResult } from './types'
+import { DockerContainer, DockerImage, DockerNetwork, DockerVolume, CommandResult } from './types'
 
 export interface DockerState {
   containers: DockerContainer[]
   images: DockerImage[]
+  networks: DockerNetwork[]
+  volumes: DockerVolume[]
 }
 
 export function parseCommand(
@@ -79,6 +81,12 @@ export function parseCommand(
       return handleHistory(parts, state)
     case 'system':
       return handleSystem(parts, state, updateState)
+    case 'network':
+      return handleNetwork(parts, state, updateState)
+    case 'volume':
+      return handleVolume(parts, state, updateState)
+    case 'cp':
+      return handleCp(parts, state)
     default:
       return {
         success: false,
@@ -185,6 +193,7 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
   const ports: string[] = []
   const env: Record<string, string> = {}
   const volumes: string[] = []
+  const networks: string[] = []
   let imageName = ''
 
   for (let i = 2; i < parts.length; i++) {
@@ -218,6 +227,14 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
         return { success: false, output: '', error: 'docker run: -v requires a volume argument (e.g. -v /host:/container)' }
       }
       volumes.push(volArg)
+      continue
+    }
+    if (part === '--network' || part === '--net') {
+      const netArg = parts[++i]
+      if (!netArg) {
+        return { success: false, output: '', error: 'docker run: --network requires a network name' }
+      }
+      networks.push(netArg)
       continue
     }
     if (part?.startsWith('-')) continue
@@ -288,7 +305,8 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
     env,
     volumes,
     created: Date.now(),
-    command: image.name.includes('nginx') ? 'nginx -g daemon off;' : '/bin/sh'
+    command: image.name.includes('nginx') ? 'nginx -g daemon off;' : '/bin/sh',
+    networks: networks.length > 0 ? networks : ['bridge']
   }
 
   updateState({
@@ -566,7 +584,8 @@ function handleInspect(parts: string[], state: DockerState): CommandResult {
         Created: new Date(container.created).toISOString(),
         Ports: container.ports,
         Env: container.env,
-        Volumes: container.volumes
+        Volumes: container.volumes,
+        Networks: container.networks || ['bridge']
       }, null, 2)
     }
   }
@@ -739,18 +758,223 @@ function handleSystem(parts: string[], state: DockerState, updateState: (newStat
   const survivingContainers = state.containers.filter(c => c.status === 'running' || c.status === 'paused')
   const usedImageNames = new Set(survivingContainers.map(c => c.image))
   const unusedImages = state.images.filter(img => !usedImageNames.has(`${img.name}:${img.tag}`))
+  const unusedNetworks = state.networks.filter(n => n.containers.length === 0)
 
   const removedContainers = stoppedContainers.length
   const removedImages = unusedImages.length
+  const removedNetworks = unusedNetworks.length
 
   updateState({
     containers: survivingContainers,
-    images: state.images.filter(img => usedImageNames.has(`${img.name}:${img.tag}`))
+    images: state.images.filter(img => usedImageNames.has(`${img.name}:${img.tag}`)),
+    networks: state.networks.filter(n => n.containers.length > 0),
+    volumes: state.volumes
   })
 
   return {
     success: true,
-    output: `Deleted ${removedContainers} stopped container(s)\nDeleted ${removedImages} unused image(s)\nTotal reclaimed space: ${removedContainers * 50 + removedImages * 100}MB`
+    output: `Deleted ${removedContainers} stopped container(s)\nDeleted ${removedImages} unused image(s)\nDeleted ${removedNetworks} unused network(s)\nTotal reclaimed space: ${removedContainers * 50 + removedImages * 100}MB`
+  }
+}
+
+function handleNetwork(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const action = parts[2]
+  if (!action) {
+    return { success: false, output: '', error: 'docker network: subcommand required. Available: create, ls, rm, connect, disconnect' }
+  }
+
+  switch (action) {
+    case 'create': {
+      let driver = 'bridge'
+      let networkName = ''
+      for (let i = 3; i < parts.length; i++) {
+        if (parts[i] === '--driver') {
+          driver = parts[++i] || 'bridge'
+        } else if (!parts[i].startsWith('-')) {
+          networkName = parts[i]
+        }
+      }
+      if (!networkName) {
+        return { success: false, output: '', error: 'docker network create: network name required' }
+      }
+      if (state.networks.find(n => n.name === networkName)) {
+        return { success: false, output: '', error: `network with name ${networkName} already exists` }
+      }
+      const newNetwork: DockerNetwork = {
+        id: generateId(),
+        name: networkName,
+        driver,
+        containers: [],
+        created: Date.now()
+      }
+      updateState({ ...state, networks: [...state.networks, newNetwork] })
+      return { success: true, output: newNetwork.id }
+    }
+    case 'ls': {
+      if (state.networks.length === 0) {
+        return { success: true, output: 'NETWORK ID     NAME           DRIVER    SCOPE\n(no networks)' }
+      }
+      const header = 'NETWORK ID     NAME           DRIVER    SCOPE'
+      const rows = state.networks.map(n => {
+        return `${n.id.substring(0, 12).padEnd(15)}${n.name.padEnd(15)}${n.driver.padEnd(10)}local`
+      })
+      return { success: true, output: [header, ...rows].join('\n') }
+    }
+    case 'rm': {
+      const netRef = parts[3]
+      if (!netRef) {
+        return { success: false, output: '', error: 'docker network rm: network name or ID required' }
+      }
+      const network = state.networks.find(n => n.name === netRef || n.id.startsWith(netRef))
+      if (!network) {
+        return { success: false, output: '', error: `No such network: ${netRef}` }
+      }
+      if (network.containers.length > 0) {
+        return { success: false, output: '', error: `network ${network.name} has active endpoints` }
+      }
+      updateState({ ...state, networks: state.networks.filter(n => n.id !== network.id) })
+      return { success: true, output: netRef }
+    }
+    case 'connect': {
+      const netName = parts[3]
+      const containerRef = parts[4]
+      if (!netName || !containerRef) {
+        return { success: false, output: '', error: 'docker network connect: requires NETWORK CONTAINER' }
+      }
+      const network = state.networks.find(n => n.name === netName || n.id.startsWith(netName))
+      if (!network) {
+        return { success: false, output: '', error: `No such network: ${netName}` }
+      }
+      const container = findContainer(containerRef, state.containers)
+      if (!container) {
+        return { success: false, output: '', error: `No such container: ${containerRef}` }
+      }
+      if (network.containers.includes(container.id)) {
+        return { success: false, output: '', error: `container ${container.name} is already connected to ${network.name}` }
+      }
+      updateState({
+        ...state,
+        networks: state.networks.map(n =>
+          n.id === network.id ? { ...n, containers: [...n.containers, container.id] } : n
+        ),
+        containers: state.containers.map(c =>
+          c.id === container.id ? { ...c, networks: [...(c.networks || []), network.name] } : c
+        )
+      })
+      return { success: true, output: '' }
+    }
+    case 'disconnect': {
+      const netName = parts[3]
+      const containerRef = parts[4]
+      if (!netName || !containerRef) {
+        return { success: false, output: '', error: 'docker network disconnect: requires NETWORK CONTAINER' }
+      }
+      const network = state.networks.find(n => n.name === netName || n.id.startsWith(netName))
+      if (!network) {
+        return { success: false, output: '', error: `No such network: ${netName}` }
+      }
+      const container = findContainer(containerRef, state.containers)
+      if (!container) {
+        return { success: false, output: '', error: `No such container: ${containerRef}` }
+      }
+      if (!network.containers.includes(container.id)) {
+        return { success: false, output: '', error: `container ${container.name} is not connected to ${network.name}` }
+      }
+      updateState({
+        ...state,
+        networks: state.networks.map(n =>
+          n.id === network.id ? { ...n, containers: n.containers.filter(id => id !== container.id) } : n
+        ),
+        containers: state.containers.map(c =>
+          c.id === container.id ? { ...c, networks: (c.networks || []).filter(n => n !== network.name) } : c
+        )
+      })
+      return { success: true, output: '' }
+    }
+    default:
+      return { success: false, output: '', error: `docker network: unknown command '${action}'. Available: create, ls, rm, connect, disconnect` }
+  }
+}
+
+function handleVolume(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const action = parts[2]
+  if (!action) {
+    return { success: false, output: '', error: 'docker volume: subcommand required. Available: create, ls, rm' }
+  }
+
+  switch (action) {
+    case 'create': {
+      const volumeName = parts[3]
+      if (!volumeName) {
+        return { success: false, output: '', error: 'docker volume create: volume name required' }
+      }
+      if (state.volumes.find(v => v.name === volumeName)) {
+        return { success: false, output: '', error: `volume with name ${volumeName} already exists` }
+      }
+      const newVolume: DockerVolume = {
+        id: generateId(),
+        name: volumeName,
+        driver: 'local',
+        mountpoint: `/var/lib/docker/volumes/${volumeName}/_data`,
+        created: Date.now()
+      }
+      updateState({ ...state, volumes: [...state.volumes, newVolume] })
+      return { success: true, output: volumeName }
+    }
+    case 'ls': {
+      if (state.volumes.length === 0) {
+        return { success: true, output: 'DRIVER    VOLUME NAME\n(no volumes)' }
+      }
+      const header = 'DRIVER    VOLUME NAME'
+      const rows = state.volumes.map(v => `${v.driver.padEnd(10)}${v.name}`)
+      return { success: true, output: [header, ...rows].join('\n') }
+    }
+    case 'rm': {
+      const volRef = parts[3]
+      if (!volRef) {
+        return { success: false, output: '', error: 'docker volume rm: volume name required' }
+      }
+      const volume = state.volumes.find(v => v.name === volRef || v.id.startsWith(volRef))
+      if (!volume) {
+        return { success: false, output: '', error: `No such volume: ${volRef}` }
+      }
+      updateState({ ...state, volumes: state.volumes.filter(v => v.id !== volume.id) })
+      return { success: true, output: volRef }
+    }
+    default:
+      return { success: false, output: '', error: `docker volume: unknown command '${action}'. Available: create, ls, rm` }
+  }
+}
+
+function handleCp(parts: string[], state: DockerState): CommandResult {
+  const src = parts[2]
+  const dst = parts[3]
+  if (!src || !dst) {
+    return { success: false, output: '', error: 'docker cp: requires SRC_PATH DEST_PATH (use CONTAINER:PATH for container paths)' }
+  }
+
+  // Determine which arg references a container
+  const srcHasContainer = src.includes(':')
+  const dstHasContainer = dst.includes(':')
+
+  if (!srcHasContainer && !dstHasContainer) {
+    return { success: false, output: '', error: 'docker cp: one of source or destination must be a container path (CONTAINER:PATH)' }
+  }
+
+  const containerRef = srcHasContainer ? src.split(':')[0] : dst.split(':')[0]
+  const container = findContainer(containerRef || '', state.containers)
+  if (!container) {
+    return { success: false, output: '', error: `No such container: ${containerRef}` }
+  }
+
+  if (container.status !== 'running' && container.status !== 'paused') {
+    return { success: false, output: '', error: `Container ${containerRef} is not running` }
+  }
+
+  const direction = srcHasContainer ? 'from' : 'to'
+  return {
+    success: true,
+    output: `Successfully copied ${direction} ${container.name}\n(simulated - in reality this would copy files between host and container)`
   }
 }
 
@@ -804,7 +1028,7 @@ Container Commands:
     Filters: status=running|stopped|exited|paused, name=PATTERN
   docker run [OPTIONS] IMAGE  Create and start a container
     Options: -d (detached), --name NAME, -p HOST:CONTAINER,
-             -e KEY=VALUE, -v HOST:CONTAINER
+             -e KEY=VALUE, -v HOST:CONTAINER, --network NETWORK
   docker stop CONTAINER...    Stop one or more running containers
   docker start CONTAINER...   Start one or more stopped containers
   docker rm [-f] CONTAINER... Remove one or more containers (-f forces)
@@ -813,6 +1037,7 @@ Container Commands:
   docker rename OLD NEW       Rename a container
   docker pause CONTAINER      Pause a running container
   docker unpause CONTAINER    Resume a paused container
+  docker cp SRC DEST          Copy files between container and host
 
 Image Commands:
   docker images               List all images
@@ -821,22 +1046,39 @@ Image Commands:
   docker tag SOURCE TARGET    Create a tag TARGET from SOURCE image
   docker history IMAGE        Show image layer history
 
+Network Commands:
+  docker network create NAME  Create a new network
+  docker network ls           List all networks
+  docker network rm NETWORK   Remove a network
+  docker network connect NETWORK CONTAINER    Connect container to network
+  docker network disconnect NETWORK CONTAINER Disconnect container from network
+
+Volume Commands:
+  docker volume create NAME   Create a new volume
+  docker volume ls            List all volumes
+  docker volume rm VOLUME     Remove a volume
+
 Inspect & System:
   docker inspect NAME/ID      Show detailed information
   docker system prune         Remove stopped containers and unused images
 
 Other:
   help                        Show this help message
-  clear                       Clear terminal
+  clear                       Clear terminal (also Ctrl+L)
 
 Examples:
   docker pull nginx:latest
   docker run -d --name web -p 8080:80 nginx
   docker run -e NODE_ENV=production -v ./data:/data node:20-alpine
+  docker run -d --name web --network my-net nginx
   docker ps --filter status=running
   docker stop web db
   docker rm web db
   docker tag nginx myregistry/nginx:v1
+  docker network create my-net
+  docker network connect my-net web
+  docker volume create my-data
+  docker cp web:/etc/nginx/nginx.conf ./nginx.conf
   docker system prune`
 }
 
@@ -874,6 +1116,32 @@ export function getInitialImages(): DockerImage[] {
       size: '41MB',
       created: now - 86400000 * 2,
       layers: ['7f8e9d0c1b2a', 'b3c4d5e6f7a8', '1a2b3c4d5e6f']
+    }
+  ]
+}
+
+export function getInitialNetworks(): DockerNetwork[] {
+  return [
+    {
+      id: generateId(),
+      name: 'bridge',
+      driver: 'bridge',
+      containers: [],
+      created: Date.now() - 86400000 * 30
+    },
+    {
+      id: generateId(),
+      name: 'host',
+      driver: 'host',
+      containers: [],
+      created: Date.now() - 86400000 * 30
+    },
+    {
+      id: generateId(),
+      name: 'none',
+      driver: 'null',
+      containers: [],
+      created: Date.now() - 86400000 * 30
     }
   ]
 }

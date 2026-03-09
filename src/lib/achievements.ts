@@ -8,8 +8,8 @@ export const achievements: Achievement[] = [
     icon: 'rocket',
     rarity: 'common',
     requirement: (data) => {
-      return Object.values(data.tutorialProgresses).some(p => p.completed)
-    }
+      return Object.values(data.tutorialProgresses).some((p) => p.completed)
+    },
   },
   {
     id: 'docker-novice',
@@ -19,7 +19,7 @@ export const achievements: Achievement[] = [
     rarity: 'common',
     requirement: (data) => {
       return data.tutorialProgresses['getting-started']?.completed === true
-    }
+    },
   },
   {
     id: 'container-master',
@@ -29,7 +29,7 @@ export const achievements: Achievement[] = [
     rarity: 'common',
     requirement: (data) => {
       return data.tutorialProgresses['multi-container']?.completed === true
-    }
+    },
   },
   {
     id: 'lifecycle-expert',
@@ -39,7 +39,7 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.tutorialProgresses['container-lifecycle']?.completed === true
-    }
+    },
   },
   {
     id: 'advanced-operator',
@@ -49,7 +49,7 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.tutorialProgresses['advanced-operations']?.completed === true
-    }
+    },
   },
   {
     id: 'dedicated-learner',
@@ -58,12 +58,12 @@ export const achievements: Achievement[] = [
     icon: 'book-open',
     rarity: 'rare',
     requirement: (data) => {
-      return Object.values(data.tutorialProgresses).filter(p => p.completed).length >= 3
+      return Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 3
     },
     progress: (data) => {
-      const current = Object.values(data.tutorialProgresses).filter(p => p.completed).length
+      const current = Object.values(data.tutorialProgresses).filter((p) => p.completed).length
       return { current, target: 3 }
-    }
+    },
   },
   {
     id: 'docker-scholar',
@@ -72,15 +72,33 @@ export const achievements: Achievement[] = [
     icon: 'trophy',
     rarity: 'epic',
     requirement: (data) => {
-      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations', 'image-tagging', 'cleanup-workflows']
-      return allTutorialIds.every(id => data.tutorialProgresses[id]?.completed === true)
+      const allTutorialIds = [
+        'getting-started',
+        'multi-container',
+        'container-lifecycle',
+        'advanced-operations',
+        'image-tagging',
+        'cleanup-workflows',
+        'docker-networking',
+      ]
+      return allTutorialIds.every((id) => data.tutorialProgresses[id]?.completed === true)
     },
     progress: (data) => {
-      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations', 'image-tagging', 'cleanup-workflows']
+      const allTutorialIds = [
+        'getting-started',
+        'multi-container',
+        'container-lifecycle',
+        'advanced-operations',
+        'image-tagging',
+        'cleanup-workflows',
+        'docker-networking',
+      ]
 
-      const current = allTutorialIds.filter(id => data.tutorialProgresses[id]?.completed === true).length
+      const current = allTutorialIds.filter(
+        (id) => data.tutorialProgresses[id]?.completed === true
+      ).length
       return { current, target: allTutorialIds.length }
-    }
+    },
   },
   {
     id: 'command-explorer',
@@ -93,7 +111,7 @@ export const achievements: Achievement[] = [
     },
     progress: (data) => {
       return { current: Math.min(data.totalCommandsExecuted, 50), target: 50 }
-    }
+    },
   },
   {
     id: 'command-veteran',
@@ -106,7 +124,7 @@ export const achievements: Achievement[] = [
     },
     progress: (data) => {
       return { current: Math.min(data.totalCommandsExecuted, 200), target: 200 }
-    }
+    },
   },
   {
     id: 'marathon-runner',
@@ -115,12 +133,12 @@ export const achievements: Achievement[] = [
     icon: 'lightning',
     rarity: 'epic',
     requirement: (data) => {
-      return data.containers.filter(c => c.status === 'running').length >= 10
+      return data.containers.filter((c) => c.status === 'running').length >= 10
     },
     progress: (data) => {
-      const current = data.containers.filter(c => c.status === 'running').length
+      const current = data.containers.filter((c) => c.status === 'running').length
       return { current: Math.min(current, 10), target: 10 }
-    }
+    },
   },
   {
     id: 'image-collector',
@@ -133,7 +151,7 @@ export const achievements: Achievement[] = [
     },
     progress: (data) => {
       return { current: Math.min(data.images.length, 10), target: 10 }
-    }
+    },
   },
   {
     id: 'speed-learner',
@@ -142,12 +160,12 @@ export const achievements: Achievement[] = [
     icon: 'timer',
     rarity: 'epic',
     requirement: (data) => {
-      return Object.values(data.tutorialProgresses).some(p => {
+      return Object.values(data.tutorialProgresses).some((p) => {
         if (!p.completed || !p.completedAt) return false
         const duration = p.completedAt - p.startedAt
         return duration < 5 * 60 * 1000
       })
-    }
+    },
   },
   {
     id: 'perfectionist',
@@ -156,8 +174,10 @@ export const achievements: Achievement[] = [
     icon: 'seal-check',
     rarity: 'legendary',
     requirement: (data) => {
-      return Object.values(data.tutorialProgresses).some(p => p.completed && p.wrongCommandCount === 0)
-    }
+      return Object.values(data.tutorialProgresses).some(
+        (p) => p.completed && p.wrongCommandCount === 0
+      )
+    },
   },
   {
     id: 'clean-slate',
@@ -167,7 +187,7 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.containers.length === 0 && data.images.length === 0
-    }
+    },
   },
   {
     id: 'tag-master',
@@ -177,7 +197,7 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.tutorialProgresses['image-tagging']?.completed === true
-    }
+    },
   },
   {
     id: 'tidy-operator',
@@ -187,7 +207,7 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.tutorialProgresses['cleanup-workflows']?.completed === true
-    }
+    },
   },
   {
     id: 'freeze-frame',
@@ -196,8 +216,8 @@ export const achievements: Achievement[] = [
     icon: 'pause',
     rarity: 'common',
     requirement: (data) => {
-      return data.containers.some(c => c.status === 'paused')
-    }
+      return data.containers.some((c) => c.status === 'paused')
+    },
   },
   {
     id: 'name-game',
@@ -207,27 +227,34 @@ export const achievements: Achievement[] = [
     rarity: 'common',
     requirement: (data) => {
       return data.totalCommandsExecuted >= 10
-    }
-  }
+    },
+  },
+  {
+    id: 'network-engineer',
+    title: 'Network Engineer',
+    description: 'Complete the "Docker Networking" tutorial',
+    icon: 'graph',
+    rarity: 'epic',
+    requirement: (data) => {
+      return data.tutorialProgresses['docker-networking']?.completed === true
+    },
+  },
 ]
 
-export function checkAchievements(
-  currentUnlocked: string[],
-  data: AchievementCheckData
-): string[] {
+export function checkAchievements(currentUnlocked: string[], data: AchievementCheckData): string[] {
   const newUnlocked: string[] = []
-  
+
   for (const achievement of achievements) {
     if (!currentUnlocked.includes(achievement.id) && achievement.requirement(data)) {
       newUnlocked.push(achievement.id)
     }
   }
-  
+
   return newUnlocked
 }
 
 export function getAchievementById(id: string): Achievement | undefined {
-  return achievements.find(a => a.id === id)
+  return achievements.find((a) => a.id === id)
 }
 
 export function getRarityColor(rarity: Achievement['rarity']): string {

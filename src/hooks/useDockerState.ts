@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { DockerContainer, DockerImage, TerminalLine, TutorialProgress, UnlockedAchievement } from '@/lib/types'
-import { parseCommand, getInitialImages } from '@/lib/docker-parser'
+import { DockerContainer, DockerImage, DockerNetwork, DockerVolume, TerminalLine, TutorialProgress, UnlockedAchievement } from '@/lib/types'
+import { parseCommand, getInitialImages, getInitialNetworks } from '@/lib/docker-parser'
 import { getTutorialById, checkCommandMatch } from '@/lib/tutorials'
 import { checkAchievements, getAchievementById } from '@/lib/achievements'
 import { toast } from 'sonner'
@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 export function useDockerState() {
   const [containers, setContainers] = useKV<DockerContainer[]>('docker-containers', [])
   const [images, setImages] = useKV<DockerImage[]>('docker-images', getInitialImages())
+  const [networks, setNetworks] = useKV<DockerNetwork[]>('docker-networks', getInitialNetworks())
+  const [volumes, setVolumes] = useKV<DockerVolume[]>('docker-volumes', [])
   const [tutorialProgresses, setTutorialProgresses] = useKV<Record<string, TutorialProgress>>('tutorial-progresses', {})
   const [activeTutorialId, setActiveTutorialId] = useKV<string | null>('active-tutorial', null)
   const [hasSeenQuickStart, setHasSeenQuickStart] = useKV<boolean>('has-seen-quickstart', false)
@@ -27,6 +29,8 @@ export function useDockerState() {
 
   const currentContainers = useMemo(() => containers || [], [containers])
   const currentImages = useMemo(() => images || [], [images])
+  const currentNetworks = useMemo(() => networks || [], [networks])
+  const currentVolumes = useMemo(() => volumes || [], [volumes])
   const activeTutorial = activeTutorialId ? getTutorialById(activeTutorialId) : null
   const activeTutorialProgress = activeTutorialId ? tutorialProgresses?.[activeTutorialId] : null
 
@@ -128,10 +132,12 @@ export function useDockerState() {
 
     const result = parseCommand(
       command,
-      { containers: currentContainers, images: currentImages },
+      { containers: currentContainers, images: currentImages, networks: currentNetworks, volumes: currentVolumes },
       (newState) => {
         setContainers(newState.containers)
         setImages(newState.images)
+        setNetworks(newState.networks)
+        setVolumes(newState.volumes)
       }
     )
 
@@ -170,7 +176,7 @@ export function useDockerState() {
         })
       }
     }
-  }, [currentContainers, currentImages, activeTutorial, activeTutorialProgress, activeTutorialId, addTerminalLine, handleStepComplete, setTotalCommandsExecuted, setContainers, setImages, setTutorialProgresses])
+  }, [currentContainers, currentImages, currentNetworks, currentVolumes, activeTutorial, activeTutorialProgress, activeTutorialId, addTerminalLine, handleStepComplete, setTotalCommandsExecuted, setContainers, setImages, setNetworks, setVolumes, setTutorialProgresses])
 
   const handleStartTutorial = useCallback((tutorialId: string) => {
     const tutorial = getTutorialById(tutorialId)
