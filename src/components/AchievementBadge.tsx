@@ -26,7 +26,7 @@ interface AchievementBadgeProps {
   className?: string
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ weight?: string; className?: string }>> = {
   'rocket': Rocket,
   'graduation-cap': GraduationCap,
   'cube': Cube,

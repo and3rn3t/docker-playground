@@ -781,9 +781,9 @@ function generateSize(): string {
   return `${size}MB`
 }
 
-function generateLayers(imageName: string): string[] {
+function generateLayers(_imageName: string): string[] {
   const layerCount = Math.floor(Math.random() * 3) + 3
-  return Array.from({ length: layerCount }, (_, i) => 
+  return Array.from({ length: layerCount }, () => 
     `${generateId().substring(0, 12)}`
   )
 }

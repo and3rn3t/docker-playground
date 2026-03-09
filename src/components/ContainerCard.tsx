@@ -2,7 +2,7 @@ import { DockerContainer } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Play, Stop, Trash, Pause } from '@phosphor-icons/react'
+import { Play, Stop, Trash } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 

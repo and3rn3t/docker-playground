@@ -1,23 +1,85 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# Docker Playground
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+An interactive web application that **simulates** Docker concepts and CLI commands in the browser. Learn containerization fundamentals through hands-on experimentation — no Docker installation required.
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+Built with React 19, TypeScript, Vite, Tailwind CSS v4, and GitHub Spark.
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+## Features
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+- **Interactive Terminal** — Type real Docker commands and see simulated results with syntax highlighting
+- **20 Docker Commands** — `run`, `ps`, `images`, `stop`, `start`, `rm`, `rmi`, `pull`, `exec`, `logs`, `inspect`, `rename`, `pause`, `unpause`, `tag`, `history`, `system prune`, and more
+- **Container Visualization** — Visual cards showing container status, ports, environment variables, and volumes
+- **Image Management** — Browse images, view layers, pull new images, tag and organize
+- **6 Guided Tutorials** — From beginner basics to intermediate workflows with step-by-step validation
+- **18 Achievements** — Gamification rewards for completing tutorials and mastering commands
+- **Persistent State** — Progress, containers, and images survive page refreshes
+- **Mobile Responsive** — Fully usable on mobile devices with adaptive layout
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+## Getting Started
 
-📄 License For Spark Template Resources 
+```bash
+# Install dependencies
+npm install
 
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Lint code
+npm run lint
+
+# Production build
+npm run build
+```
+
+## Project Structure
+
+```
+src/
+├── components/          # Application components
+│   ├── ui/              # shadcn/ui primitives (do not modify)
+│   ├── Terminal.tsx      # Command terminal with syntax highlighting
+│   ├── ContainerCard.tsx # Container visualization card
+│   ├── ImageCard.tsx     # Image display with layer details
+│   ├── TutorialPanel.tsx # Active tutorial step guide
+│   └── ...
+├── hooks/               # Custom React hooks
+│   ├── use-mobile.ts
+│   └── useDockerState.ts # Core state management hook
+├── lib/                 # Core logic
+│   ├── docker-parser.ts  # Command parser & simulation engine
+│   ├── tutorials.ts      # Tutorial definitions
+│   ├── achievements.ts   # Achievement definitions & checks
+│   ├── types.ts          # Shared TypeScript interfaces
+│   └── utils.ts          # Utility functions
+└── styles/              # Theme CSS variables
+```
+
+## Supported Commands
+
+| Category | Commands |
+|----------|----------|
+| **Container** | `run`, `ps`, `stop`, `start`, `rm`, `exec`, `logs`, `rename`, `pause`, `unpause` |
+| **Image** | `images`, `pull`, `rmi`, `tag`, `history` |
+| **System** | `inspect`, `system prune` |
+| **Other** | `help`, `clear` |
+
+## Tech Stack
+
+- **React 19** + TypeScript
+- **Vite 7** for builds
+- **Tailwind CSS v4** with custom theme
+- **Radix UI** + shadcn/ui component primitives
+- **Framer Motion** for animations
+- **Phosphor Icons** for iconography
+- **Vitest** for testing (98 tests)
+- **GitHub Spark** for persistent state (`useKV`)
+
+## License
+
+See [LICENSE](LICENSE) for details.
