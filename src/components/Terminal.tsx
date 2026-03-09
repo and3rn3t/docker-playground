@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Terminal as TerminalIcon } from '@phosphor-icons/react'
 import { TerminalLine } from '@/lib/types'
@@ -56,10 +55,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
 
   useEffect(() => {
     if (scrollRef.current) {
-      const scrollElement = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight
-      }
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [lines])
 
@@ -104,7 +100,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
         <span className="ml-auto text-xs text-muted-foreground font-mono">Type 'help' for commands</span>
       </div>
 
-      <ScrollArea ref={scrollRef} className="flex-1 p-4">
+      <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto custom-scrollbar">
         <div className="space-y-1 font-mono text-sm">
           <AnimatePresence initial={false}>
             {lines.map((line) => (
@@ -131,7 +127,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
             ))}
           </AnimatePresence>
         </div>
-      </ScrollArea>
+      </div>
 
       <form onSubmit={handleSubmit} className="border-t border-border p-3 bg-muted/30">
         <div className="flex items-center gap-2 relative">

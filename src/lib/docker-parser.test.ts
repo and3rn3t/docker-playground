@@ -377,10 +377,10 @@ describe('parseCommand', () => {
       expect(newState.images[0].tag).toBe('latest')
     })
 
-    it('rejects pulling already existing image', () => {
+    it('succeeds with up-to-date message when pulling existing image', () => {
       const result = parseCommand('docker pull nginx:latest', makeState(), noopUpdate)
-      expect(result.success).toBe(false)
-      expect(result.error).toContain('already exists')
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('up to date')
     })
 
     it('requires image name', () => {

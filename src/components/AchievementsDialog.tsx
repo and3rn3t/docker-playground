@@ -1,5 +1,4 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -206,7 +205,7 @@ export function AchievementsDialog({
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="h-[48vh] mt-4 pr-4">
+          <div className="h-[48vh] mt-4 pr-4 overflow-y-auto custom-scrollbar">
             <TabsContent value="all">
               {renderAchievementList(achievementsByRarity.all)}
             </TabsContent>
@@ -222,7 +221,7 @@ export function AchievementsDialog({
             <TabsContent value="common">
               {renderAchievementList(achievementsByRarity.common)}
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>

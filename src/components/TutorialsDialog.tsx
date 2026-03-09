@@ -1,5 +1,4 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { tutorials } from '@/lib/tutorials'
 import { TutorialCard } from './TutorialCard'
 import { TutorialProgress } from '@/lib/types'
@@ -27,7 +26,7 @@ export function TutorialsDialog({
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="px-6 pb-6 max-h-[70vh]">
+        <div className="px-6 pb-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-4">
             {tutorials.map((tutorial) => {
               const progress = tutorialProgresses.get(tutorial.id)
@@ -44,7 +43,7 @@ export function TutorialsDialog({
               )
             })}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )

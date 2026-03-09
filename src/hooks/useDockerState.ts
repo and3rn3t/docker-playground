@@ -119,9 +119,7 @@ export function useDockerState() {
         unlockedAt: Date.now()
       }))
       setUnlockedAchievements(current => [...(current || []), ...newUnlocked])
-      return newAchievementIds.map(id => getAchievementById(id)).filter(Boolean)
     }
-    return []
   }, [tutorialProgresses, currentContainers, currentImages, totalCommandsExecuted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCommand = useCallback((command: string) => {

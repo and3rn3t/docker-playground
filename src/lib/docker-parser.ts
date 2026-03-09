@@ -457,9 +457,8 @@ function handlePull(parts: string[], state: DockerState, updateState: (newState:
 
   if (state.images.find(img => img.name === name && img.tag === tag)) {
     return {
-      success: false,
-      output: '',
-      error: `Image ${name}:${tag} already exists`
+      success: true,
+      output: `${tag}: Pulling from ${name}\nDigest: sha256:${generateId()}${generateId()}\nStatus: Image is up to date for ${name}:${tag}`
     }
   }
 

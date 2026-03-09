@@ -1,5 +1,4 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 
 interface HelpDialogProps {
@@ -151,7 +150,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
         <DialogHeader>
           <DialogTitle className="text-2xl">Docker Command Reference</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="h-[60vh] pr-4">
+        <div className="h-[60vh] pr-4 overflow-y-auto custom-scrollbar">
           <div className="space-y-6">
             {commands.map((section) => (
               <div key={section.category}>
@@ -187,7 +186,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )
