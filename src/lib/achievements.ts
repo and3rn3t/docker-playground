@@ -72,11 +72,11 @@ export const achievements: Achievement[] = [
     icon: 'trophy',
     rarity: 'epic',
     requirement: (data) => {
-      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations']
+      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations', 'image-tagging', 'cleanup-workflows']
       return allTutorialIds.every(id => data.tutorialProgresses[id]?.completed === true)
     },
     progress: (data) => {
-      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations']
+      const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations', 'image-tagging', 'cleanup-workflows']
       const current = allTutorialIds.filter(id => data.tutorialProgresses[id]?.completed === true).length
       return { current, target: allTutorialIds.length }
     }
@@ -166,6 +166,46 @@ export const achievements: Achievement[] = [
     rarity: 'rare',
     requirement: (data) => {
       return data.containers.length === 0 && data.images.length === 0
+    }
+  },
+  {
+    id: 'tag-master',
+    title: 'Tag Master',
+    description: 'Complete the "Image Tagging & Organization" tutorial',
+    icon: 'tag',
+    rarity: 'rare',
+    requirement: (data) => {
+      return data.tutorialProgresses['image-tagging']?.completed === true
+    }
+  },
+  {
+    id: 'tidy-operator',
+    title: 'Tidy Operator',
+    description: 'Complete the "System Cleanup & Maintenance" tutorial',
+    icon: 'broom',
+    rarity: 'rare',
+    requirement: (data) => {
+      return data.tutorialProgresses['cleanup-workflows']?.completed === true
+    }
+  },
+  {
+    id: 'freeze-frame',
+    title: 'Freeze Frame',
+    description: 'Pause and unpause a container',
+    icon: 'pause',
+    rarity: 'common',
+    requirement: (data) => {
+      return data.containers.some(c => c.status === 'paused')
+    }
+  },
+  {
+    id: 'name-game',
+    title: 'Name Game',
+    description: 'Rename a container using docker rename',
+    icon: 'pencil',
+    rarity: 'common',
+    requirement: (data) => {
+      return data.totalCommandsExecuted >= 10
     }
   }
 ]

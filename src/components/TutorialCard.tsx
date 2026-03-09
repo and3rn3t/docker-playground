@@ -2,7 +2,7 @@ import { Tutorial } from '@/lib/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Clock, Rocket, Stack as StackIcon, ArrowsClockwise, Gear } from '@phosphor-icons/react'
+import { Clock, Rocket, Stack as StackIcon, ArrowsClockwise, Gear, Tag, Broom } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 
 interface TutorialCardProps {
@@ -15,7 +15,9 @@ const iconMap = {
   rocket: Rocket,
   stack: StackIcon,
   cycle: ArrowsClockwise,
-  gear: Gear
+  gear: Gear,
+  tag: Tag,
+  broom: Broom
 }
 
 const difficultyColors = {

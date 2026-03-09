@@ -13,34 +13,34 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
       category: 'Container Commands',
       items: [
         {
-          command: 'docker ps',
-          description: 'List running containers',
-          options: '-a or --all to show all containers',
-          example: 'docker ps -a'
+          command: 'docker ps [OPTIONS]',
+          description: 'List containers (running by default)',
+          options: '-a (all), -q (IDs only), --no-trunc, --filter key=value',
+          example: 'docker ps -a --filter status=running'
         },
         {
           command: 'docker run [OPTIONS] IMAGE',
           description: 'Create and start a new container',
-          options: '-d (detached), --name NAME, -p HOST:CONTAINER',
-          example: 'docker run -d --name web -p 8080:80 nginx:latest'
+          options: '-d (detached), --name NAME, -p HOST:CONTAINER, -e KEY=VALUE, -v HOST:CONTAINER',
+          example: 'docker run -d --name web -p 8080:80 -e NODE_ENV=prod nginx'
         },
         {
-          command: 'docker stop CONTAINER',
-          description: 'Stop a running container',
-          options: '',
-          example: 'docker stop web'
+          command: 'docker stop CONTAINER...',
+          description: 'Stop one or more running containers',
+          options: 'Accepts multiple container names/IDs',
+          example: 'docker stop web api db'
         },
         {
-          command: 'docker start CONTAINER',
-          description: 'Start a stopped container',
-          options: '',
-          example: 'docker start web'
+          command: 'docker start CONTAINER...',
+          description: 'Start one or more stopped containers',
+          options: 'Accepts multiple container names/IDs',
+          example: 'docker start web api'
         },
         {
-          command: 'docker rm CONTAINER',
-          description: 'Remove a container',
-          options: '-f or --force to remove running container',
-          example: 'docker rm -f web'
+          command: 'docker rm [-f] CONTAINER...',
+          description: 'Remove one or more containers',
+          options: '-f or --force to remove running containers',
+          example: 'docker rm -f web api'
         },
         {
           command: 'docker logs CONTAINER',
@@ -53,6 +53,24 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           description: 'Execute command in running container',
           options: '',
           example: 'docker exec web ls -la'
+        },
+        {
+          command: 'docker rename OLD NEW',
+          description: 'Rename a container',
+          options: '',
+          example: 'docker rename old-name new-name'
+        },
+        {
+          command: 'docker pause CONTAINER',
+          description: 'Pause a running container (freeze processes)',
+          options: '',
+          example: 'docker pause web'
+        },
+        {
+          command: 'docker unpause CONTAINER',
+          description: 'Resume a paused container',
+          options: '',
+          example: 'docker unpause web'
         }
       ]
     },
@@ -78,10 +96,33 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           example: 'docker rmi nginx:latest'
         },
         {
+          command: 'docker tag SOURCE TARGET',
+          description: 'Create a tag TARGET from SOURCE image',
+          options: '',
+          example: 'docker tag nginx myregistry/nginx:v1'
+        },
+        {
+          command: 'docker history IMAGE',
+          description: 'Show image layer history',
+          options: '',
+          example: 'docker history nginx:latest'
+        }
+      ]
+    },
+    {
+      category: 'Inspect & System',
+      items: [
+        {
           command: 'docker inspect NAME/ID',
           description: 'Show detailed information about container or image',
           options: '',
           example: 'docker inspect web'
+        },
+        {
+          command: 'docker system prune',
+          description: 'Remove stopped containers and unused images',
+          options: '',
+          example: 'docker system prune'
         }
       ]
     },

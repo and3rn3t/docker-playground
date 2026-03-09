@@ -395,6 +395,176 @@ export const tutorials: Tutorial[] = [
         successMessage: 'Excellent! You\'ve mastered advanced container operations!'
       }
     ]
+  },
+  {
+    id: 'image-tagging',
+    title: 'Image Tagging & Organization',
+    description: 'Learn to tag images, view layer history, and organize your image library.',
+    difficulty: 'intermediate',
+    estimatedTime: '8 min',
+    icon: 'tag',
+    steps: [
+      {
+        id: 'check-images',
+        title: 'List available images',
+        description: 'Start by checking what images you already have locally.',
+        expectedCommand: ['docker images'],
+        hints: [
+          'Use docker images to list all local images',
+          'Try: docker images'
+        ],
+        successMessage: 'Good! You can see all your local images with their tags and sizes.'
+      },
+      {
+        id: 'pull-node',
+        title: 'Pull a base image',
+        description: 'Pull the Node.js Alpine image — a small, efficient base for apps.',
+        expectedCommand: ['docker pull node:20-alpine', 'docker pull node'],
+        hints: [
+          'Pull the node image with the 20-alpine tag',
+          'Try: docker pull node:20-alpine'
+        ],
+        successMessage: 'Node.js Alpine is a popular lightweight base image!'
+      },
+      {
+        id: 'tag-image',
+        title: 'Tag the image',
+        description: 'Create a new tag for the image to simulate pushing to your own registry.',
+        expectedCommand: ['docker tag node:20-alpine myapp:latest', 'docker tag node myapp:latest'],
+        hints: [
+          'Use docker tag SOURCE TARGET to create a new reference',
+          'Try: docker tag node:20-alpine myapp:latest'
+        ],
+        validation: (state) => {
+          return state.images.some(i => i.name === 'myapp')
+        },
+        successMessage: 'Tagged! The new tag shares the same layers as the source — no extra space used.'
+      },
+      {
+        id: 'tag-version',
+        title: 'Create a version tag',
+        description: 'Tag the image with a version number for proper release management.',
+        expectedCommand: ['docker tag node:20-alpine myapp:v1.0', 'docker tag node myapp:v1.0'],
+        hints: [
+          'Tag with a version number like v1.0',
+          'Try: docker tag node:20-alpine myapp:v1.0'
+        ],
+        validation: (state) => {
+          return state.images.some(i => i.name === 'myapp' && i.tag === 'v1.0')
+        },
+        successMessage: 'Version tags help track releases — always tag with semantic versions in production!'
+      },
+      {
+        id: 'view-history',
+        title: 'View image layer history',
+        description: 'Inspect the layers that make up an image to understand how it was built.',
+        expectedCommand: ['docker history node:20-alpine', 'docker history node', 'docker history myapp:latest', 'docker history myapp:v1.0'],
+        hints: [
+          'Use docker history to see image layers',
+          'Try: docker history node:20-alpine'
+        ],
+        successMessage: 'Each layer represents a build step. Smaller images mean faster pulls and deployments!'
+      },
+      {
+        id: 'verify-tags',
+        title: 'Verify your tagged images',
+        description: 'List images again to see all your tags alongside the originals.',
+        expectedCommand: ['docker images'],
+        hints: [
+          'List all images to see your work',
+          'Try: docker images'
+        ],
+        successMessage: 'Excellent! You\'ve mastered image tagging. Tags are essential for versioning and registry workflows!'
+      }
+    ]
+  },
+  {
+    id: 'cleanup-workflows',
+    title: 'System Cleanup & Maintenance',
+    description: 'Learn to clean up unused resources and keep your Docker environment tidy.',
+    difficulty: 'intermediate',
+    estimatedTime: '10 min',
+    icon: 'broom',
+    steps: [
+      {
+        id: 'create-mess',
+        title: 'Create some containers',
+        description: 'Let\'s create a few containers to simulate a busy development environment.',
+        expectedCommand: ['docker run -d --name app-1 nginx:latest', 'docker run -d --name app-1 nginx'],
+        hints: [
+          'Run an nginx container named app-1',
+          'Try: docker run -d --name app-1 nginx'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'app-1')
+        },
+        successMessage: 'First container created!'
+      },
+      {
+        id: 'create-more',
+        title: 'Create another container',
+        description: 'Add a second container to the mix.',
+        expectedCommand: ['docker run -d --name app-2 redis:alpine', 'docker run -d --name app-2 redis'],
+        hints: [
+          'Run a redis container named app-2',
+          'Try: docker run -d --name app-2 redis:alpine'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'app-2')
+        },
+        successMessage: 'Two containers running now!'
+      },
+      {
+        id: 'stop-one',
+        title: 'Stop a container',
+        description: 'Stop one container to simulate an abandoned workload.',
+        expectedCommand: ['docker stop app-1'],
+        hints: [
+          'Stop the first container',
+          'Try: docker stop app-1'
+        ],
+        validation: (state) => {
+          return state.containers.some(c => c.name === 'app-1' && c.status === 'stopped')
+        },
+        successMessage: 'Now we have a mix of running and stopped containers — a common real-world scenario.'
+      },
+      {
+        id: 'view-all',
+        title: 'View all containers including stopped',
+        description: 'Use the -a flag to see all containers, including stopped ones.',
+        expectedCommand: ['docker ps -a'],
+        hints: [
+          'Add -a flag to see all containers',
+          'Try: docker ps -a'
+        ],
+        successMessage: 'The -a flag reveals stopped containers that are still using disk space.'
+      },
+      {
+        id: 'system-prune',
+        title: 'Prune the system',
+        description: 'Use system prune to clean up stopped containers and unused images in one command.',
+        expectedCommand: ['docker system prune'],
+        hints: [
+          'System prune removes all stopped containers and unused images',
+          'Try: docker system prune'
+        ],
+        validation: (state) => {
+          return !state.containers.some(c => c.status === 'stopped')
+        },
+        successMessage: 'Clean! System prune is the quickest way to reclaim disk space. Always review what\'s running first!'
+      },
+      {
+        id: 'verify-cleanup',
+        title: 'Verify the cleanup',
+        description: 'Check that stopped containers were removed while running ones are still active.',
+        expectedCommand: ['docker ps -a', 'docker ps'],
+        hints: [
+          'List all containers to confirm the cleanup',
+          'Try: docker ps -a'
+        ],
+        successMessage: 'Excellent! You\'ve learned to keep Docker environments clean — a critical production skill!'
+      }
+    ]
   }
 ]
 
