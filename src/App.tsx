@@ -6,6 +6,7 @@ import { ImageCard } from '@/components/ImageCard'
 import { HelpDialog } from '@/components/HelpDialog'
 import { TutorialsDialog } from '@/components/TutorialsDialog'
 import { TutorialPanel } from '@/components/TutorialPanel'
+import { TutorialProgressTracker } from '@/components/TutorialProgressTracker'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -327,6 +328,7 @@ function App() {
                     <span className="text-muted-foreground"> / {currentContainers.length} running</span>
                   </span>
                 </div>
+                <TutorialProgressTracker tutorialProgresses={tutorialProgressesMap} />
                 <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary">
                   <GraduationCap weight="bold" />
                   <span>Tutorials</span>
