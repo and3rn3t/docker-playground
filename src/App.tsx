@@ -8,18 +8,20 @@ import { TutorialsDialog } from '@/components/TutorialsDialog'
 import { TutorialPanel } from '@/components/TutorialPanel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Question, Cube, Stack as StackIcon, GraduationCap } from '@phosphor-icons/react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X } from '@phosphor-icons/react'
 import { DockerContainer, DockerImage, TerminalLine, TutorialProgress } from '@/lib/types'
 import { parseCommand, getInitialImages } from '@/lib/docker-parser'
 import { getTutorialById, checkCommandMatch } from '@/lib/tutorials'
 import { toast, Toaster } from 'sonner'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 
 function App() {
   const [containers, setContainers] = useKV<DockerContainer[]>('docker-containers', [])
   const [images, setImages] = useKV<DockerImage[]>('docker-images', getInitialImages())
   const [tutorialProgresses, setTutorialProgresses] = useKV<Record<string, TutorialProgress>>('tutorial-progresses', {})
   const [activeTutorialId, setActiveTutorialId] = useKV<string | null>('active-tutorial', null)
+  const [hasSeenQuickStart, setHasSeenQuickStart] = useKV<boolean>('has-seen-quickstart', false)
   
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([
     {
@@ -31,11 +33,21 @@ function App() {
   ])
   const [helpOpen, setHelpOpen] = useState(false)
   const [tutorialsOpen, setTutorialsOpen] = useState(false)
+  const [quickStartVisible, setQuickStartVisible] = useState(false)
 
   const currentContainers = containers || []
   const currentImages = images || []
   const activeTutorial = activeTutorialId ? getTutorialById(activeTutorialId) : null
   const activeTutorialProgress = activeTutorialId ? tutorialProgresses?.[activeTutorialId] : null
+
+  useEffect(() => {
+    if (!hasSeenQuickStart && !activeTutorialId && Object.keys(tutorialProgresses || {}).length === 0) {
+      const timer = setTimeout(() => {
+        setQuickStartVisible(true)
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [hasSeenQuickStart, activeTutorialId, tutorialProgresses])
 
   useEffect(() => {
     if (activeTutorialProgress && activeTutorial) {
@@ -219,6 +231,14 @@ function App() {
       })
       toast.success('Tutorial started!', { description: tutorial.title })
     }
+    
+    setQuickStartVisible(false)
+    setHasSeenQuickStart(true)
+  }
+
+  const handleDismissQuickStart = () => {
+    setQuickStartVisible(false)
+    setHasSeenQuickStart(true)
   }
 
   const handleExitTutorial = () => {
@@ -323,6 +343,59 @@ function App() {
         <main className="container mx-auto px-6 py-6">
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
+              <AnimatePresence>
+                {quickStartVisible && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Card className="border-accent bg-gradient-to-br from-card to-accent/5 glow-accent">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-4 flex-1">
+                            <div className="p-3 rounded-lg bg-accent/20 glow-accent">
+                              <Rocket weight="duotone" className="text-accent text-2xl" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold mb-1">Quick Start</h3>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                New to Docker? Start with our beginner tutorial and learn the basics in just 5 minutes!
+                              </p>
+                              <div className="flex items-center gap-3">
+                                <Button 
+                                  onClick={() => handleStartTutorial('getting-started')} 
+                                  className="glow-primary"
+                                  size="sm"
+                                >
+                                  <Rocket weight="bold" />
+                                  <span>Start Tutorial</span>
+                                </Button>
+                                <Button 
+                                  onClick={handleDismissQuickStart} 
+                                  variant="ghost" 
+                                  size="sm"
+                                >
+                                  <span>Maybe later</span>
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={handleDismissQuickStart}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 -mr-2 -mt-2"
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {activeTutorial && activeTutorialProgress && (
                 <TutorialPanel
                   tutorial={activeTutorial}
