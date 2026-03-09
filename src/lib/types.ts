@@ -13,6 +13,7 @@ export interface DockerContainer {
   image: string
   status: 'running' | 'stopped' | 'exited'
   ports: string[]
+  env: Record<string, string>
   created: number
   command: string
 }
@@ -57,6 +58,7 @@ export interface TutorialProgress {
   completed: boolean
   startedAt: number
   completedAt?: number
+  wrongCommandCount: number
 }
 
 export interface Achievement {

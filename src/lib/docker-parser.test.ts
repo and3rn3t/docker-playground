@@ -16,6 +16,7 @@ function makeContainer(overrides?: Partial<DockerContainer>): DockerContainer {
     image: 'nginx:latest',
     status: 'running',
     ports: [],
+    env: {},
     created: Date.now(),
     command: 'nginx -g daemon off;',
     ...overrides,
@@ -470,6 +471,129 @@ describe('parseCommand', () => {
 
       const result = parseCommand('docker stop abc123def456', state, vi.fn())
       expect(result.success).toBe(true)
+    })
+  })
+
+  describe('port validation', () => {
+    it('rejects invalid port format (missing colon)', () => {
+      const result = parseCommand('docker run -p 8080 nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid port mapping')
+      expect(result.error).toContain('HOST_PORT:CONTAINER_PORT')
+    })
+
+    it('rejects out-of-range host port', () => {
+      const result = parseCommand('docker run -p 99999:80 nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid host port')
+      expect(result.error).toContain('1 and 65535')
+    })
+
+    it('rejects out-of-range container port', () => {
+      const result = parseCommand('docker run -p 80:70000 nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid container port')
+    })
+
+    it('rejects non-numeric port', () => {
+      const result = parseCommand('docker run -p abc:80 nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid host port')
+    })
+
+    it('rejects port 0', () => {
+      const result = parseCommand('docker run -p 0:80 nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid host port')
+    })
+
+    it('accepts valid port mapping', () => {
+      const result = parseCommand('docker run -p 8080:80 nginx', makeState(), vi.fn())
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('port conflict detection', () => {
+    it('rejects port already used by a running container', () => {
+      const existing = makeContainer({ name: 'web', ports: ['8080:80'], status: 'running' })
+      const state = makeState({ containers: [existing] })
+
+      const result = parseCommand('docker run -p 8080:80 nginx', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already in use')
+      expect(result.error).toContain('web')
+    })
+
+    it('allows reuse of port from a stopped container', () => {
+      const existing = makeContainer({ name: 'web', ports: ['8080:80'], status: 'stopped' })
+      const state = makeState({ containers: [existing] })
+
+      const result = parseCommand('docker run --name web2 -p 8080:80 nginx', state, vi.fn())
+      expect(result.success).toBe(true)
+    })
+
+    it('allows different host port even if container port matches', () => {
+      const existing = makeContainer({ name: 'web', ports: ['8080:80'], status: 'running' })
+      const state = makeState({ containers: [existing] })
+
+      const result = parseCommand('docker run --name web2 -p 9090:80 nginx', state, vi.fn())
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('multiple port mappings', () => {
+    it('accepts multiple -p flags', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -p 8080:80 -p 443:443 nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.ports).toEqual(['8080:80', '443:443'])
+    })
+  })
+
+  describe('environment variable parsing', () => {
+    it('parses -e KEY=VALUE flags', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -e NODE_ENV=production nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.env).toEqual({ NODE_ENV: 'production' })
+    })
+
+    it('parses multiple -e flags', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -e A=1 -e B=2 nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.env).toEqual({ A: '1', B: '2' })
+    })
+
+    it('handles -e with values containing equals sign', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run -e DSN=host=db;port=5432 nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.env).toEqual({ DSN: 'host=db;port=5432' })
+    })
+
+    it('container has empty env when no -e flags', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker run nginx', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const created = updateState.mock.calls[0][0].containers.at(-1)
+      expect(created.env).toEqual({})
+    })
+  })
+
+  describe('docker inspect with env', () => {
+    it('includes env in inspect output', () => {
+      const container = makeContainer({ name: 'web', env: { NODE_ENV: 'production' } })
+      const state = makeState({ containers: [container] })
+
+      const result = parseCommand('docker inspect web', state, noopUpdate)
+      expect(result.success).toBe(true)
+      const parsed = JSON.parse(result.output)
+      expect(parsed.Env).toEqual({ NODE_ENV: 'production' })
     })
   })
 })

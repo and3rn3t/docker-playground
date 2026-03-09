@@ -180,6 +180,13 @@ function App() {
       if (isCorrectCommand && result.success && !currentStep.validation) {
         handleStepComplete()
       } else if (!isCorrectCommand && result.success) {
+        setTutorialProgresses(current => ({
+          ...current,
+          [activeTutorialId!]: {
+            ...activeTutorialProgress,
+            wrongCommandCount: (activeTutorialProgress.wrongCommandCount ?? 0) + 1
+          }
+        }))
         addTerminalLine({
           type: 'error',
           content: '⚠️  This command works, but it\'s not what the tutorial expects. Try following the tutorial step.'
@@ -208,7 +215,8 @@ function App() {
           currentStepIndex: 0,
           completedSteps: [],
           completed: false,
-          startedAt: Date.now()
+          startedAt: Date.now(),
+          wrongCommandCount: 0
         }
       }))
       setActiveTutorialId(tutorialId)

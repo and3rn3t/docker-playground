@@ -130,17 +130,38 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
   const nameIndex = parts.indexOf('--name')
   let containerName = nameIndex > -1 ? parts[nameIndex + 1] : undefined
   
+  // Parse flags and collect ports, env vars, and image name
+  const ports: string[] = []
+  const env: Record<string, string> = {}
   let imageName = ''
+
   for (let i = 2; i < parts.length; i++) {
-    if (parts[i] === '-d' || parts[i] === '--detach' || parts[i] === '--name') {
-      if (parts[i] === '--name') i++
+    const part = parts[i]
+    if (part === '-d' || part === '--detach') continue
+    if (part === '--name') { i++; continue }
+    if (part === '-p' || part === '--publish') {
+      const portMapping = parts[++i]
+      if (!portMapping) {
+        return { success: false, output: '', error: 'docker run: -p requires a port mapping argument (e.g. -p 8080:80)' }
+      }
+      ports.push(portMapping)
       continue
     }
-    if (parts[i]?.startsWith('-p')) {
-      i++
+    if (part === '-e' || part === '--env') {
+      const envArg = parts[++i]
+      if (!envArg) {
+        return { success: false, output: '', error: 'docker run: -e requires a KEY=VALUE argument' }
+      }
+      const eqIndex = envArg.indexOf('=')
+      if (eqIndex === -1) {
+        env[envArg] = ''
+      } else {
+        env[envArg.substring(0, eqIndex)] = envArg.substring(eqIndex + 1)
+      }
       continue
     }
-    imageName = parts[i] || ''
+    if (part?.startsWith('-')) continue
+    imageName = part || ''
     break
   }
 
@@ -173,8 +194,30 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
     }
   }
 
-  const portIndex = parts.findIndex(p => p === '-p')
-  const ports = portIndex > -1 ? [parts[portIndex + 1] || ''] : []
+  // Validate port mappings
+  for (const mapping of ports) {
+    const portParts = mapping.split(':')
+    if (portParts.length !== 2) {
+      return { success: false, output: '', error: `Invalid port mapping '${mapping}'. Format: HOST_PORT:CONTAINER_PORT` }
+    }
+    const [hostPort, containerPort] = portParts
+    const hostNum = Number(hostPort)
+    const containerNum = Number(containerPort)
+    if (!Number.isInteger(hostNum) || hostNum < 1 || hostNum > 65535) {
+      return { success: false, output: '', error: `Invalid host port '${hostPort}'. Must be between 1 and 65535.` }
+    }
+    if (!Number.isInteger(containerNum) || containerNum < 1 || containerNum > 65535) {
+      return { success: false, output: '', error: `Invalid container port '${containerPort}'. Must be between 1 and 65535.` }
+    }
+
+    // Check for port conflicts with running containers
+    const conflict = state.containers.find(c => 
+      c.status === 'running' && c.ports.some(p => p.split(':')[0] === hostPort)
+    )
+    if (conflict) {
+      return { success: false, output: '', error: `Port ${hostPort} is already in use by container '${conflict.name}'.` }
+    }
+  }
 
   const newContainer: DockerContainer = {
     id: generateId(),
@@ -182,6 +225,7 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
     image: `${image.name}:${image.tag}`,
     status: 'running',
     ports,
+    env,
     created: Date.now(),
     command: image.name.includes('nginx') ? 'nginx -g daemon off;' : '/bin/sh'
   }
@@ -483,7 +527,8 @@ function handleInspect(parts: string[], state: DockerState): CommandResult {
           Running: container.status === 'running'
         },
         Created: new Date(container.created).toISOString(),
-        Ports: container.ports
+        Ports: container.ports,
+        Env: container.env
       }, null, 2)
     }
   }
@@ -561,7 +606,7 @@ function getHelpText(): string {
 Container Commands:
   docker ps [-a]              List running containers (-a shows all)
   docker run [OPTIONS] IMAGE  Create and start a container
-    Options: -d (detached), --name NAME, -p HOST:CONTAINER
+    Options: -d (detached), --name NAME, -p HOST:CONTAINER, -e KEY=VALUE
   docker stop CONTAINER       Stop a running container
   docker start CONTAINER      Start a stopped container
   docker rm [-f] CONTAINER    Remove a container (-f forces removal)

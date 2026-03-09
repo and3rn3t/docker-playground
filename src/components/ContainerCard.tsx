@@ -51,6 +51,14 @@ export function ContainerCard({ container, onStop, onStart, onRemove }: Containe
                   <span className="truncate">{container.ports.join(', ')}</span>
                 </div>
               )}
+              {container.env && Object.keys(container.env).length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-primary">Env:</span>
+                  <span className="truncate">
+                    {Object.entries(container.env).map(([k, v]) => `${k}=${v}`).join(', ')}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

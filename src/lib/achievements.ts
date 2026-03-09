@@ -155,7 +155,7 @@ export const achievements: Achievement[] = [
     icon: 'seal-check',
     rarity: 'legendary',
     requirement: (data) => {
-      return Object.values(data.tutorialProgresses).some(p => p.completed)
+      return Object.values(data.tutorialProgresses).some(p => p.completed && p.wrongCommandCount === 0)
     }
   },
   {
