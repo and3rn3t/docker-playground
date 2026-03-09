@@ -7,13 +7,16 @@ import { HelpDialog } from '@/components/HelpDialog'
 import { TutorialsDialog } from '@/components/TutorialsDialog'
 import { TutorialPanel } from '@/components/TutorialPanel'
 import { TutorialProgressTracker } from '@/components/TutorialProgressTracker'
+import { AchievementsDialog } from '@/components/AchievementsDialog'
+import { AchievementToast } from '@/components/AchievementToast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X } from '@phosphor-icons/react'
-import { DockerContainer, DockerImage, TerminalLine, TutorialProgress } from '@/lib/types'
+import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X, Sparkle } from '@phosphor-icons/react'
+import { DockerContainer, DockerImage, TerminalLine, TutorialProgress, UnlockedAchievement } from '@/lib/types'
 import { parseCommand, getInitialImages } from '@/lib/docker-parser'
 import { getTutorialById, checkCommandMatch } from '@/lib/tutorials'
+import { checkAchievements, getAchievementById } from '@/lib/achievements'
 import { toast, Toaster } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 
@@ -23,6 +26,8 @@ function App() {
   const [tutorialProgresses, setTutorialProgresses] = useKV<Record<string, TutorialProgress>>('tutorial-progresses', {})
   const [activeTutorialId, setActiveTutorialId] = useKV<string | null>('active-tutorial', null)
   const [hasSeenQuickStart, setHasSeenQuickStart] = useKV<boolean>('has-seen-quickstart', false)
+  const [unlockedAchievements, setUnlockedAchievements] = useKV<UnlockedAchievement[]>('unlocked-achievements', [])
+  const [totalCommandsExecuted, setTotalCommandsExecuted] = useKV<number>('total-commands-executed', 0)
   
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([
     {
@@ -34,6 +39,7 @@ function App() {
   ])
   const [helpOpen, setHelpOpen] = useState(false)
   const [tutorialsOpen, setTutorialsOpen] = useState(false)
+  const [achievementsOpen, setAchievementsOpen] = useState(false)
   const [quickStartVisible, setQuickStartVisible] = useState(false)
 
   const currentContainers = containers || []
@@ -61,6 +67,34 @@ function App() {
       }
     }
   }, [currentContainers, currentImages])
+
+  useEffect(() => {
+    const unlockedIds = (unlockedAchievements || []).map(a => a.achievementId)
+    const newAchievementIds = checkAchievements(unlockedIds, {
+      tutorialProgresses: tutorialProgresses || {},
+      containers: currentContainers,
+      images: currentImages,
+      totalCommandsExecuted: totalCommandsExecuted || 0
+    })
+
+    if (newAchievementIds.length > 0) {
+      const newUnlocked: UnlockedAchievement[] = newAchievementIds.map(id => ({
+        achievementId: id,
+        unlockedAt: Date.now()
+      }))
+
+      setUnlockedAchievements(current => [...(current || []), ...newUnlocked])
+
+      newAchievementIds.forEach(id => {
+        const achievement = getAchievementById(id)
+        if (achievement) {
+          toast(<AchievementToast achievement={achievement} />, {
+            duration: 5000,
+          })
+        }
+      })
+    }
+  }, [tutorialProgresses, currentContainers, currentImages, totalCommandsExecuted])
 
   const addTerminalLine = (line: Omit<TerminalLine, 'id' | 'timestamp'>) => {
     setTerminalLines(prev => [...prev, {
@@ -113,6 +147,7 @@ function App() {
 
   const handleCommand = (command: string) => {
     addTerminalLine({ type: 'command', content: command })
+    setTotalCommandsExecuted(current => (current || 0) + 1)
 
     if (activeTutorial && activeTutorialProgress) {
       const currentStep = activeTutorial.steps[activeTutorialProgress.currentStepIndex]
@@ -329,6 +364,15 @@ function App() {
                   </span>
                 </div>
                 <TutorialProgressTracker tutorialProgresses={tutorialProgressesMap} />
+                <Button onClick={() => setAchievementsOpen(true)} variant="secondary" size="sm">
+                  <Sparkle weight="bold" />
+                  <span>Achievements</span>
+                  {(unlockedAchievements || []).length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground text-xs font-mono">
+                      {(unlockedAchievements || []).length}
+                    </span>
+                  )}
+                </Button>
                 <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary">
                   <GraduationCap weight="bold" />
                   <span>Tutorials</span>
@@ -497,6 +541,11 @@ function App() {
         onOpenChange={setTutorialsOpen}
         onStartTutorial={handleStartTutorial}
         tutorialProgresses={tutorialProgressesMap}
+      />
+      <AchievementsDialog 
+        open={achievementsOpen} 
+        onOpenChange={setAchievementsOpen}
+        unlockedAchievements={unlockedAchievements || []}
       />
       <Toaster theme="dark" position="bottom-right" />
     </div>

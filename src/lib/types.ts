@@ -58,3 +58,24 @@ export interface TutorialProgress {
   startedAt: number
   completedAt?: number
 }
+
+export interface Achievement {
+  id: string
+  title: string
+  description: string
+  icon: string
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  requirement: (data: AchievementCheckData) => boolean
+}
+
+export interface AchievementCheckData {
+  tutorialProgresses: Record<string, TutorialProgress>
+  containers: DockerContainer[]
+  images: DockerImage[]
+  totalCommandsExecuted: number
+}
+
+export interface UnlockedAchievement {
+  achievementId: string
+  unlockedAt: number
+}
