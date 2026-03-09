@@ -272,7 +272,7 @@ function handleRun(parts: string[], state: DockerState, updateState: (newState: 
 
     // Check for port conflicts with running containers
     const conflict = state.containers.find(c => 
-      c.status === 'running' && c.ports.some(p => p.split(':')[0] === hostPort)
+      (c.status === 'running' || c.status === 'paused') && c.ports.some(p => p.split(':')[0] === hostPort)
     )
     if (conflict) {
       return { success: false, output: '', error: `Port ${hostPort} is already in use by container '${conflict.name}'.` }

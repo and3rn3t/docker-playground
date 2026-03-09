@@ -64,6 +64,7 @@ export function TutorialPanel({
             size="sm" 
             onClick={onExit}
             className="text-muted-foreground hover:text-foreground"
+            aria-label="Exit tutorial"
           >
             <X size={20} weight="bold" />
           </Button>

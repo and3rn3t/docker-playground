@@ -82,7 +82,7 @@ function App() {
                   </span>
                 </div>
                 <TutorialProgressTracker tutorialProgresses={tutorialProgressesMap} />
-                <Button onClick={() => setAchievementsOpen(true)} variant="secondary" size="sm">
+                <Button onClick={() => setAchievementsOpen(true)} variant="secondary" size="sm" aria-label="View achievements">
                   <Sparkle weight="bold" />
                   <span className="hidden sm:inline">Achievements</span>
                   {(unlockedAchievements || []).length > 0 && (
@@ -91,11 +91,11 @@ function App() {
                     </span>
                   )}
                 </Button>
-                <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary">
+                <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary" aria-label="View tutorials">
                   <GraduationCap weight="bold" />
                   <span className="hidden sm:inline">Tutorials</span>
                 </Button>
-                <Button onClick={() => setHelpOpen(true)} variant="outline" size="sm">
+                <Button onClick={() => setHelpOpen(true)} variant="outline" size="sm" aria-label="Show help">
                   <Question weight="bold" />
                   <span className="hidden sm:inline">Help</span>
                 </Button>
@@ -151,6 +151,7 @@ function App() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 -mr-2 -mt-2"
+                            aria-label="Dismiss quick start"
                           >
                             <X />
                           </Button>

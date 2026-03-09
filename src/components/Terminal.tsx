@@ -100,7 +100,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
         <span className="ml-auto text-xs text-muted-foreground font-mono">Type 'help' for commands</span>
       </div>
 
-      <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+      <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto custom-scrollbar" role="log" aria-label="Terminal output">
         <div className="space-y-1 font-mono text-sm">
           <AnimatePresence initial={false}>
             {lines.map((line) => (
@@ -142,6 +142,7 @@ export function Terminal({ lines, onCommand }: TerminalProps) {
             <Input
               ref={inputRef}
               id="terminal-input"
+              aria-label="Docker terminal input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

@@ -525,6 +525,16 @@ describe('parseCommand', () => {
       expect(result.error).toContain('web')
     })
 
+    it('rejects port already used by a paused container', () => {
+      const existing = makeContainer({ name: 'web', ports: ['8080:80'], status: 'paused' })
+      const state = makeState({ containers: [existing] })
+
+      const result = parseCommand('docker run -p 8080:80 nginx', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already in use')
+      expect(result.error).toContain('web')
+    })
+
     it('allows reuse of port from a stopped container', () => {
       const existing = makeContainer({ name: 'web', ports: ['8080:80'], status: 'stopped' })
       const state = makeState({ containers: [existing] })

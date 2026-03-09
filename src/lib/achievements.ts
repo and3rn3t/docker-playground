@@ -77,6 +77,7 @@ export const achievements: Achievement[] = [
     },
     progress: (data) => {
       const allTutorialIds = ['getting-started', 'multi-container', 'container-lifecycle', 'advanced-operations', 'image-tagging', 'cleanup-workflows']
+
       const current = allTutorialIds.filter(id => data.tutorialProgresses[id]?.completed === true).length
       return { current, target: allTutorialIds.length }
     }

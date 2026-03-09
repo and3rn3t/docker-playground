@@ -14,7 +14,10 @@ import {
   Stack,
   Timer,
   SealCheck,
-  Broom
+  Broom,
+  Pause,
+  PencilSimple,
+  Tag,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
@@ -26,7 +29,8 @@ interface AchievementBadgeProps {
   className?: string
 }
 
-const iconMap: Record<string, React.ComponentType<{ weight?: string; className?: string }>> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const iconMap: Record<string, React.ComponentType<any>> = {
   'rocket': Rocket,
   'graduation-cap': GraduationCap,
   'cube': Cube,
@@ -41,6 +45,9 @@ const iconMap: Record<string, React.ComponentType<{ weight?: string; className?:
   'timer': Timer,
   'seal-check': SealCheck,
   'broom': Broom,
+  'pause': Pause,
+  'pencil': PencilSimple,
+  'tag': Tag,
 }
 
 export function AchievementBadge({ 

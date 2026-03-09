@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -20,15 +21,15 @@ export function AchievementsDialog({
   unlockedAchievements,
   achievementData
 }: AchievementsDialogProps) {
-  const unlockedIds = new Set(unlockedAchievements.map(a => a.achievementId))
+  const unlockedIds = useMemo(() => new Set(unlockedAchievements.map(a => a.achievementId)), [unlockedAchievements])
   
-  const achievementsByRarity = {
+  const achievementsByRarity = useMemo(() => ({
     all: achievements,
     legendary: achievements.filter(a => a.rarity === 'legendary'),
     epic: achievements.filter(a => a.rarity === 'epic'),
     rare: achievements.filter(a => a.rarity === 'rare'),
     common: achievements.filter(a => a.rarity === 'common'),
-  }
+  }), [])
 
   const unlockedCount = unlockedAchievements.length
   const totalCount = achievements.length
