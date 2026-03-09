@@ -1,4 +1,4 @@
-import { Achievement } from './types'
+import { Achievement, AchievementCheckData } from './types'
 
 export const achievements: Achievement[] = [
   {
@@ -172,12 +172,7 @@ export const achievements: Achievement[] = [
 
 export function checkAchievements(
   currentUnlocked: string[],
-  data: {
-    tutorialProgresses: Record<string, any>
-    containers: any[]
-    images: any[]
-    totalCommandsExecuted: number
-  }
+  data: AchievementCheckData
 ): string[] {
   const newUnlocked: string[] = []
   

@@ -14,14 +14,6 @@ export function parseCommand(
   const mainCommand = parts[0]?.toLowerCase()
   const subCommand = parts[1]?.toLowerCase()
 
-  if (mainCommand !== 'docker' && mainCommand !== '') {
-    return {
-      success: false,
-      output: '',
-      error: `Command not found: ${mainCommand}. Try 'docker' commands or 'help'.`
-    }
-  }
-
   if (command.trim() === 'help' || (mainCommand === 'docker' && subCommand === 'help')) {
     return {
       success: true,
@@ -33,6 +25,14 @@ export function parseCommand(
     return {
       success: true,
       output: 'CLEAR_TERMINAL'
+    }
+  }
+
+  if (mainCommand !== 'docker' && mainCommand !== '') {
+    return {
+      success: false,
+      output: '',
+      error: `Command not found: ${mainCommand}. Try 'docker' commands or 'help'.`
     }
   }
 

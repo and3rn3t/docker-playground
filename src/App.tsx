@@ -149,90 +149,41 @@ function App() {
     addTerminalLine({ type: 'command', content: command })
     setTotalCommandsExecuted(current => (current || 0) + 1)
 
+    const result = parseCommand(
+      command,
+      { containers: currentContainers, images: currentImages },
+      (newState) => {
+        setContainers(newState.containers)
+        setImages(newState.images)
+      }
+    )
+
+    if (result.output === 'CLEAR_TERMINAL') {
+      setTerminalLines([])
+      return
+    }
+
+    if (result.success) {
+      if (result.output) {
+        addTerminalLine({ type: 'output', content: result.output })
+      }
+    } else {
+      if (result.error) {
+        addTerminalLine({ type: 'error', content: result.error })
+      }
+    }
+
     if (activeTutorial && activeTutorialProgress) {
       const currentStep = activeTutorial.steps[activeTutorialProgress.currentStepIndex]
       const isCorrectCommand = checkCommandMatch(currentStep.expectedCommand, command)
 
-      if (isCorrectCommand) {
-        const result = parseCommand(
-          command,
-          { containers: currentContainers, images: currentImages },
-          (newState) => {
-            setContainers(newState.containers)
-            setImages(newState.images)
-          }
-        )
-
-        if (result.output === 'CLEAR_TERMINAL') {
-          setTerminalLines([])
-          return
-        }
-
-        if (result.success) {
-          if (result.output) {
-            addTerminalLine({ type: 'output', content: result.output })
-          }
-          
-          if (!currentStep.validation) {
-            handleStepComplete()
-          }
-        } else {
-          if (result.error) {
-            addTerminalLine({ type: 'error', content: result.error })
-          }
-        }
-      } else {
-        const result = parseCommand(
-          command,
-          { containers: currentContainers, images: currentImages },
-          (newState) => {
-            setContainers(newState.containers)
-            setImages(newState.images)
-          }
-        )
-
-        if (result.output === 'CLEAR_TERMINAL') {
-          setTerminalLines([])
-          return
-        }
-
-        if (result.success) {
-          if (result.output) {
-            addTerminalLine({ type: 'output', content: result.output })
-          }
-          addTerminalLine({ 
-            type: 'error', 
-            content: '⚠️  This command works, but it\'s not what the tutorial expects. Try following the tutorial step.' 
-          })
-        } else {
-          if (result.error) {
-            addTerminalLine({ type: 'error', content: result.error })
-          }
-        }
-      }
-    } else {
-      const result = parseCommand(
-        command,
-        { containers: currentContainers, images: currentImages },
-        (newState) => {
-          setContainers(newState.containers)
-          setImages(newState.images)
-        }
-      )
-
-      if (result.output === 'CLEAR_TERMINAL') {
-        setTerminalLines([])
-        return
-      }
-
-      if (result.success) {
-        if (result.output) {
-          addTerminalLine({ type: 'output', content: result.output })
-        }
-      } else {
-        if (result.error) {
-          addTerminalLine({ type: 'error', content: result.error })
-        }
+      if (isCorrectCommand && result.success && !currentStep.validation) {
+        handleStepComplete()
+      } else if (!isCorrectCommand && result.success) {
+        addTerminalLine({
+          type: 'error',
+          content: '⚠️  This command works, but it\'s not what the tutorial expects. Try following the tutorial step.'
+        })
       }
     }
   }
