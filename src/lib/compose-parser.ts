@@ -1,4 +1,5 @@
 import type { DockerContainer, DockerImage, DockerNetwork } from './types'
+import { generateId } from './utils'
 
 export interface ComposeService {
   name: string
@@ -221,7 +222,7 @@ export function simulateComposeUp(
   images: DockerImage[]
   networks: DockerNetwork[]
 } {
-  const genId = () => Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+  const genId = generateId
   const now = Date.now()
 
   // Create networks declared in compose

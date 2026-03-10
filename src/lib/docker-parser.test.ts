@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { parseCommand, DockerState, getInitialImages, getInitialNetworks } from './docker-parser'
-import { DockerContainer, DockerImage, DockerNetwork, DockerService, DockerVolume } from './types'
+import { DockerContainer, DockerImage, DockerNetwork, DockerVolume } from './types'
 
 function makeState(overrides?: Partial<DockerState>): DockerState {
   return {

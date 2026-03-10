@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Terminal as TerminalIcon } from '@phosphor-icons/react'
 import { TerminalLine, DockerContainer, DockerImage } from '@/lib/types'
+import { DOCKER_SUBCOMMANDS } from '@/lib/docker-parser'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface TerminalProps {
@@ -10,22 +11,6 @@ interface TerminalProps {
   containers?: DockerContainer[]
   images?: DockerImage[]
 }
-
-const DOCKER_SUBCOMMANDS = new Set([
-  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull', 'push',
-  'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
-  'history', 'system', 'prune', 'network', 'volume', 'cp',
-  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import',
-  'build', 'login', 'logout', 'search', 'service'
-])
-
-const COMPLETABLE_SUBCOMMANDS = [
-  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull', 'push',
-  'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
-  'history', 'system', 'network', 'volume', 'cp',
-  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import',
-  'build', 'login', 'logout', 'search', 'service'
-]
 
 const NETWORK_SUBCOMMANDS = ['create', 'ls', 'rm', 'connect', 'disconnect']
 const VOLUME_SUBCOMMANDS = ['create', 'ls', 'rm']
@@ -49,7 +34,7 @@ function getCompletions(
   // After "docker", complete subcommand
   if (parts[0] === 'docker' && parts.length === 2) {
     const partial = parts[1]
-    return COMPLETABLE_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
+    return [...DOCKER_SUBCOMMANDS].filter(s => s.startsWith(partial) && s !== partial)
   }
 
   const sub = parts[1]

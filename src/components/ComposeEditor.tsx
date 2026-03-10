@@ -1,11 +1,10 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Play, ArrowDown, Lightning, CaretDown, Stop } from '@phosphor-icons/react'
+import { Play, Lightning, CaretDown, Stop } from '@phosphor-icons/react'
 import { parseComposeFile, getComposeTemplates, type ComposeParseResult } from '@/lib/compose-parser'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 
 const COMPOSE_KEYWORDS = new Set([
   'services', 'networks', 'volumes', 'version', 'name',

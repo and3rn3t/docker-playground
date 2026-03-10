@@ -16,12 +16,13 @@ import { parseCommand, getInitialImages, getInitialNetworks } from '@/lib/docker
 import { simulateBuild } from '@/lib/dockerfile-parser'
 import { parseComposeFile, simulateComposeUp } from '@/lib/compose-parser'
 import { getTutorialById, checkCommandMatch } from '@/lib/tutorials'
-import { checkAchievements, getAchievementById } from '@/lib/achievements'
+import { checkAchievements } from '@/lib/achievements'
 import { getChallengeById, type ChallengeAttempt } from '@/lib/challenges'
 import { getDailyChallenge, isDailyChallengeComplete, getTodayString } from '@/lib/daily-challenges'
 import type { PlaygroundSnapshot } from '@/lib/export'
 import type { SandboxPreset } from '@/lib/sandbox-presets'
 import { toast } from 'sonner'
+import { generateId } from '@/lib/utils'
 
 const DEFAULT_STREAK: StreakData = {
   currentStreak: 0,
@@ -501,9 +502,6 @@ export function useDockerState() {
         addTerminalLine({ type: 'error', content: result.errors.join('\n') })
         return
       }
-
-      const generateId = () =>
-        Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
 
       const existingIdx = currentImages.findIndex(
         (img) => img.name === result.imageName && img.tag === result.imageTag

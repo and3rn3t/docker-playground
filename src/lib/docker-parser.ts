@@ -1,6 +1,7 @@
 import { DockerContainer, DockerImage, DockerNetwork, DockerVolume, DockerService, CommandResult } from './types'
 import { simulateBuild } from './dockerfile-parser'
 import { searchCatalog } from './image-catalog'
+import { generateId } from './utils'
 
 export interface DockerState {
   containers: DockerContainer[]
@@ -1315,11 +1316,13 @@ function findContainer(ref: string, containers: DockerContainer[]): DockerContai
   )
 }
 
-function generateId(): string {
-  return Array.from({ length: 64 }, () => 
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('')
-}
+export const DOCKER_SUBCOMMANDS = new Set([
+  'ps', 'images', 'run', 'stop', 'start', 'rm', 'rmi', 'pull', 'push',
+  'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
+  'history', 'system', 'network', 'volume', 'cp',
+  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import',
+  'build', 'login', 'logout', 'search', 'service'
+])
 
 function generateContainerName(): string {
   const adjectives = ['clever', 'happy', 'brave', 'gentle', 'wise', 'eager', 'calm', 'bold']

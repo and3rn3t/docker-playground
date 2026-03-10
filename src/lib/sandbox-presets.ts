@@ -1,4 +1,5 @@
 import type { DockerContainer, DockerImage, DockerNetwork } from '@/lib/types'
+import { generateId as generateFullId } from '@/lib/utils'
 
 export interface SandboxPreset {
   id: string
@@ -12,8 +13,7 @@ export interface SandboxPreset {
   hints: string[]
 }
 
-const generateId = () =>
-  Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+const generateId = () => generateFullId(12)
 
 export const sandboxPresets: SandboxPreset[] = [
   {
