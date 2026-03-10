@@ -1308,11 +1308,59 @@ export function getTutorialById(id: string): Tutorial | undefined {
 }
 
 export function checkCommandMatch(expected: string | string[], actual: string): boolean {
-  const normalizedActual = actual.trim().toLowerCase()
-  
-  if (Array.isArray(expected)) {
-    return expected.some(cmd => normalizedActual === cmd.toLowerCase().trim())
+  const normalize = (cmd: string) => cmd.trim().toLowerCase().replace(/\s+/g, ' ')
+  const normalizedActual = normalize(actual)
+
+  const candidates = Array.isArray(expected) ? expected : [expected]
+
+  return candidates.some(cmd => {
+    const normalizedExpected = normalize(cmd)
+    // Exact match (after whitespace normalization)
+    if (normalizedActual === normalizedExpected) return true
+
+    // Flexible flag-order match:
+    // Parse both into { base, flags, args } and compare as sets
+    return tokensMatch(normalizedExpected, normalizedActual)
+  })
+}
+
+/**
+ * Compare two docker commands allowing flags/options in any order.
+ * Keeps positional args (docker, subcommand, image/container name) in order.
+ */
+function tokensMatch(expected: string, actual: string): boolean {
+  const parseTokens = (cmd: string) => {
+    const parts = cmd.split(' ')
+    const flags: string[] = []
+    const positional: string[] = []
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      if (part.startsWith('-')) {
+        // Flag with value (--name foo, -e VAR=val, -p 80:80, -v vol:/path)
+        const needsValue = ['--name', '-p', '-e', '-v', '--network', '--mount', '--env', '--publish', '--volume'].includes(part)
+        if (needsValue && i + 1 < parts.length) {
+          flags.push(`${part} ${parts[i + 1]}`)
+          i++
+        } else {
+          flags.push(part)
+        }
+      } else {
+        positional.push(part)
+      }
+    }
+
+    return { flags: flags.sort(), positional }
   }
-  
-  return normalizedActual === expected.toLowerCase().trim()
+
+  const exp = parseTokens(expected)
+  const act = parseTokens(actual)
+
+  if (exp.positional.length !== act.positional.length) return false
+  if (exp.flags.length !== act.flags.length) return false
+
+  const positionalMatch = exp.positional.every((p, i) => p === act.positional[i])
+  const flagsMatch = exp.flags.every((f, i) => f === act.flags[i])
+
+  return positionalMatch && flagsMatch
 }

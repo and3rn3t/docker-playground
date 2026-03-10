@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { parseCommand, DockerState, getInitialImages, getInitialNetworks } from './docker-parser'
 import { DockerContainer, DockerImage, DockerNetwork, DockerVolume } from './types'
+import { checkCommandMatch } from './tutorials'
 
 function makeState(overrides?: Partial<DockerState>): DockerState {
   return {
@@ -1566,5 +1567,59 @@ describe('parseCommand', () => {
       expect(result.success).toBe(false)
       expect(result.error).toContain('unknown subcommand')
     })
+  })
+})
+
+describe('checkCommandMatch', () => {
+  it('matches exact command', () => {
+    expect(checkCommandMatch('docker ps', 'docker ps')).toBe(true)
+  })
+
+  it('matches case-insensitively', () => {
+    expect(checkCommandMatch('docker ps', 'Docker PS')).toBe(true)
+  })
+
+  it('normalizes extra whitespace', () => {
+    expect(checkCommandMatch('docker pull nginx', 'docker  pull   nginx')).toBe(true)
+  })
+
+  it('matches with leading/trailing spaces', () => {
+    expect(checkCommandMatch('docker ps', '  docker ps  ')).toBe(true)
+  })
+
+  it('matches array of expected commands', () => {
+    expect(checkCommandMatch(['docker ps', 'docker container ls'], 'docker container ls')).toBe(true)
+  })
+
+  it('rejects non-matching commands', () => {
+    expect(checkCommandMatch('docker ps', 'docker images')).toBe(false)
+  })
+
+  it('matches flags in different order', () => {
+    expect(checkCommandMatch(
+      'docker run -d --name my-nginx nginx',
+      'docker run --name my-nginx -d nginx'
+    )).toBe(true)
+  })
+
+  it('matches flags in different order with port', () => {
+    expect(checkCommandMatch(
+      'docker run -d --name web -p 8080:80 nginx',
+      'docker run -p 8080:80 --name web -d nginx'
+    )).toBe(true)
+  })
+
+  it('rejects different flag values', () => {
+    expect(checkCommandMatch(
+      'docker run -d --name my-nginx nginx',
+      'docker run -d --name other-nginx nginx'
+    )).toBe(false)
+  })
+
+  it('matches with environment variable flags reordered', () => {
+    expect(checkCommandMatch(
+      'docker run -d --name db -e POSTGRES_PASSWORD=secret postgres',
+      'docker run -e POSTGRES_PASSWORD=secret -d --name db postgres'
+    )).toBe(true)
   })
 })
