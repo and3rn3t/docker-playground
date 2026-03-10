@@ -85,6 +85,7 @@ export interface Achievement {
   description: string
   icon: string
   rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  tier?: 'bronze' | 'silver' | 'gold'
   requirement: (data: AchievementCheckData) => boolean
   progress?: (data: AchievementCheckData) => { current: number; target: number }
 }
@@ -99,4 +100,51 @@ export interface AchievementCheckData {
 export interface UnlockedAchievement {
   achievementId: string
   unlockedAt: number
+}
+
+export interface DailyChallenge {
+  id: string
+  date: string // YYYY-MM-DD
+  title: string
+  description: string
+  objectives: DailyChallengeObjective[]
+}
+
+export interface DailyChallengeObjective {
+  id: string
+  description: string
+  check: (data: AchievementCheckData) => boolean
+}
+
+export interface StreakData {
+  currentStreak: number
+  longestStreak: number
+  lastActiveDate: string // YYYY-MM-DD
+  activeDates: string[] // YYYY-MM-DD[]
+}
+
+export interface DockerfileInstruction {
+  line: number
+  instruction: string
+  args: string
+  comment?: string
+}
+
+export interface SavedDockerfile {
+  id: string
+  name: string
+  content: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface DockerService {
+  id: string
+  name: string
+  image: string
+  replicas: number
+  desiredReplicas: number
+  ports: string[]
+  created: number
+  updateState?: 'updating' | 'completed' | 'paused'
 }

@@ -84,6 +84,10 @@ export const achievements: Achievement[] = [
         'container-debugging',
         'port-mapping',
         'env-vars-config',
+        'dockerfile-basics',
+        'compose-quickstart',
+        'advanced-networking',
+        'image-management',
       ]
       return allTutorialIds.every((id) => data.tutorialProgresses[id]?.completed === true)
     },
@@ -100,6 +104,10 @@ export const achievements: Achievement[] = [
         'container-debugging',
         'port-mapping',
         'env-vars-config',
+        'dockerfile-basics',
+        'compose-quickstart',
+        'advanced-networking',
+        'image-management',
       ]
 
       const current = allTutorialIds.filter(
@@ -300,16 +308,158 @@ export const achievements: Achievement[] = [
   {
     id: 'halfway-there',
     title: 'Halfway There',
-    description: 'Complete 5 tutorials',
+    description: 'Complete 8 tutorials',
     icon: 'star-half',
     rarity: 'rare',
     requirement: (data) => {
-      return Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 5
+      return Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 8
     },
     progress: (data) => {
       const current = Object.values(data.tutorialProgresses).filter((p) => p.completed).length
-      return { current, target: 5 }
+      return { current, target: 8 }
     },
+  },
+  // Tiered command achievements
+  {
+    id: 'command-bronze',
+    title: 'Command Apprentice',
+    description: 'Execute 25 Docker commands',
+    icon: 'terminal',
+    rarity: 'common',
+    tier: 'bronze',
+    requirement: (data) => data.totalCommandsExecuted >= 25,
+    progress: (data) => ({ current: Math.min(data.totalCommandsExecuted, 25), target: 25 }),
+  },
+  {
+    id: 'command-silver',
+    title: 'Command Specialist',
+    description: 'Execute 100 Docker commands',
+    icon: 'terminal',
+    rarity: 'rare',
+    tier: 'silver',
+    requirement: (data) => data.totalCommandsExecuted >= 100,
+    progress: (data) => ({ current: Math.min(data.totalCommandsExecuted, 100), target: 100 }),
+  },
+  {
+    id: 'command-gold',
+    title: 'Command Master',
+    description: 'Execute 500 Docker commands',
+    icon: 'terminal',
+    rarity: 'epic',
+    tier: 'gold',
+    requirement: (data) => data.totalCommandsExecuted >= 500,
+    progress: (data) => ({ current: Math.min(data.totalCommandsExecuted, 500), target: 500 }),
+  },
+  // Tiered container achievements
+  {
+    id: 'container-bronze',
+    title: 'Container Novice',
+    description: 'Run 3 containers simultaneously',
+    icon: 'cube',
+    rarity: 'common',
+    tier: 'bronze',
+    requirement: (data) => data.containers.filter((c) => c.status === 'running').length >= 3,
+    progress: (data) => ({
+      current: Math.min(data.containers.filter((c) => c.status === 'running').length, 3),
+      target: 3,
+    }),
+  },
+  {
+    id: 'container-silver',
+    title: 'Container Wrangler',
+    description: 'Run 5 containers simultaneously',
+    icon: 'cube',
+    rarity: 'rare',
+    tier: 'silver',
+    requirement: (data) => data.containers.filter((c) => c.status === 'running').length >= 5,
+    progress: (data) => ({
+      current: Math.min(data.containers.filter((c) => c.status === 'running').length, 5),
+      target: 5,
+    }),
+  },
+  {
+    id: 'container-gold',
+    title: 'Container Orchestrator',
+    description: 'Run 15 containers simultaneously',
+    icon: 'cube',
+    rarity: 'legendary',
+    tier: 'gold',
+    requirement: (data) => data.containers.filter((c) => c.status === 'running').length >= 15,
+    progress: (data) => ({
+      current: Math.min(data.containers.filter((c) => c.status === 'running').length, 15),
+      target: 15,
+    }),
+  },
+  // Tiered tutorial achievements
+  {
+    id: 'tutorial-bronze',
+    title: 'Quick Study',
+    description: 'Complete 2 tutorials',
+    icon: 'book-open',
+    rarity: 'common',
+    tier: 'bronze',
+    requirement: (data) => Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 2,
+    progress: (data) => ({
+      current: Object.values(data.tutorialProgresses).filter((p) => p.completed).length,
+      target: 2,
+    }),
+  },
+  {
+    id: 'tutorial-silver',
+    title: 'Studious Learner',
+    description: 'Complete 5 tutorials',
+    icon: 'book-open',
+    rarity: 'rare',
+    tier: 'silver',
+    requirement: (data) => Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 5,
+    progress: (data) => ({
+      current: Object.values(data.tutorialProgresses).filter((p) => p.completed).length,
+      target: 5,
+    }),
+  },
+  {
+    id: 'tutorial-gold',
+    title: 'Docker Professor',
+    description: 'Complete 12 tutorials',
+    icon: 'book-open',
+    rarity: 'epic',
+    tier: 'gold',
+    requirement: (data) => Object.values(data.tutorialProgresses).filter((p) => p.completed).length >= 12,
+    progress: (data) => ({
+      current: Object.values(data.tutorialProgresses).filter((p) => p.completed).length,
+      target: 12,
+    }),
+  },
+  // Tiered image achievements
+  {
+    id: 'image-bronze',
+    title: 'Image Apprentice',
+    description: 'Have 5 Docker images',
+    icon: 'stack',
+    rarity: 'common',
+    tier: 'bronze',
+    requirement: (data) => data.images.length >= 5,
+    progress: (data) => ({ current: Math.min(data.images.length, 5), target: 5 }),
+  },
+  {
+    id: 'image-silver',
+    title: 'Image Curator',
+    description: 'Have 15 Docker images',
+    icon: 'stack',
+    rarity: 'rare',
+    tier: 'silver',
+    requirement: (data) => data.images.length >= 15,
+    progress: (data) => ({ current: Math.min(data.images.length, 15), target: 15 }),
+  },
+  {
+    id: 'image-gold',
+    title: 'Image Hoarder',
+    description: 'Have 25 Docker images',
+    icon: 'stack',
+    rarity: 'epic',
+    tier: 'gold',
+    requirement: (data) => data.images.length >= 25,
+    progress: (data) => ({ current: Math.min(data.images.length, 25), target: 25 }),
   },
 ]
 
@@ -354,6 +504,32 @@ export function getRarityGlow(rarity: Achievement['rarity']): string {
       return 'glow-primary'
     case 'legendary':
       return 'glow-accent'
+    default:
+      return ''
+  }
+}
+
+export function getTierColor(tier?: Achievement['tier']): string {
+  switch (tier) {
+    case 'bronze':
+      return 'text-orange-400'
+    case 'silver':
+      return 'text-slate-300'
+    case 'gold':
+      return 'text-yellow-400'
+    default:
+      return ''
+  }
+}
+
+export function getTierLabel(tier?: Achievement['tier']): string {
+  switch (tier) {
+    case 'bronze':
+      return '🥉'
+    case 'silver':
+      return '🥈'
+    case 'gold':
+      return '🥇'
     default:
       return ''
   }

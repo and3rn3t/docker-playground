@@ -1,11 +1,11 @@
 import { Achievement } from '@/lib/types'
-import { getRarityColor, getRarityGlow } from '@/lib/achievements'
-import { 
-  Rocket, 
-  GraduationCap, 
-  Cube, 
-  ArrowsClockwise, 
-  Gear, 
+import { getRarityColor, getRarityGlow, getTierLabel } from '@/lib/achievements'
+import {
+  Rocket,
+  GraduationCap,
+  Cube,
+  ArrowsClockwise,
+  Gear,
   BookOpen,
   Trophy,
   Terminal,
@@ -31,43 +31,43 @@ interface AchievementBadgeProps {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const iconMap: Record<string, React.ComponentType<any>> = {
-  'rocket': Rocket,
+  rocket: Rocket,
   'graduation-cap': GraduationCap,
-  'cube': Cube,
+  cube: Cube,
   'arrows-clockwise': ArrowsClockwise,
-  'gear': Gear,
+  gear: Gear,
   'book-open': BookOpen,
-  'trophy': Trophy,
-  'terminal': Terminal,
+  trophy: Trophy,
+  terminal: Terminal,
   'terminal-window': TerminalWindow,
-  'lightning': Lightning,
-  'stack': Stack,
-  'timer': Timer,
+  lightning: Lightning,
+  stack: Stack,
+  timer: Timer,
   'seal-check': SealCheck,
-  'broom': Broom,
-  'pause': Pause,
-  'pencil': PencilSimple,
-  'tag': Tag,
+  broom: Broom,
+  pause: Pause,
+  pencil: PencilSimple,
+  tag: Tag,
 }
 
-export function AchievementBadge({ 
-  achievement, 
-  unlocked, 
+export function AchievementBadge({
+  achievement,
+  unlocked,
   size = 'md',
   showTitle = false,
-  className 
+  className,
 }: AchievementBadgeProps) {
   const Icon = iconMap[achievement.icon] || Cube
-  
+
   const sizeClasses = {
     sm: 'w-12 h-12 text-xl',
     md: 'w-16 h-16 text-2xl',
-    lg: 'w-24 h-24 text-4xl'
+    lg: 'w-24 h-24 text-4xl',
   }
-  
+
   const rarityColor = getRarityColor(achievement.rarity)
   const rarityGlow = getRarityGlow(achievement.rarity)
-  
+
   return (
     <div className={cn('flex flex-col items-center gap-2', className)}>
       <div
@@ -83,26 +83,23 @@ export function AchievementBadge({
           unlocked && achievement.rarity === 'legendary' && 'border-accent'
         )}
       >
-        <Icon 
-          weight={unlocked ? 'duotone' : 'regular'} 
-          className={cn(
-            'transition-colors',
-            unlocked ? rarityColor : 'text-muted-foreground'
-          )}
+        <Icon
+          weight={unlocked ? 'duotone' : 'regular'}
+          className={cn('transition-colors', unlocked ? rarityColor : 'text-muted-foreground')}
         />
       </div>
       {showTitle && (
         <div className="text-center">
-          <p className={cn(
-            'text-sm font-semibold',
-            unlocked ? 'text-foreground' : 'text-muted-foreground'
-          )}>
-            {achievement.title}
+          <p
+            className={cn(
+              'text-sm font-semibold',
+              unlocked ? 'text-foreground' : 'text-muted-foreground'
+            )}
+          >
+            {achievement.tier && getTierLabel(achievement.tier)} {achievement.title}
           </p>
           {unlocked && (
-            <p className="text-xs text-muted-foreground capitalize">
-              {achievement.rarity}
-            </p>
+            <p className="text-xs text-muted-foreground capitalize">{achievement.rarity}</p>
           )}
         </div>
       )}

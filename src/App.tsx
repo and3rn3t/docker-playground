@@ -11,12 +11,21 @@ import { AchievementToast } from '@/components/AchievementToast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X, Sparkle, Sun, Moon } from '@phosphor-icons/react'
+import { Question, Cube, Stack as StackIcon, GraduationCap, Rocket, X, Sparkle, Sun, Moon, FileCode, ShareNetwork, Trophy, StackSimple, Export, GameController, User } from '@phosphor-icons/react'
 import { getAchievementById } from '@/lib/achievements'
 import { toast, Toaster } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useDockerState } from '@/hooks/useDockerState'
 import { useTheme } from '@/hooks/useTheme'
+import { DockerfileEditor } from '@/components/DockerfileEditor'
+import { NetworkGraph } from '@/components/NetworkGraph'
+import { ChallengesDialog } from '@/components/ChallengesDialog'
+import { ChallengePanel } from '@/components/ChallengePanel'
+import { ComposeEditor } from '@/components/ComposeEditor'
+import { ExportDialog } from '@/components/ExportDialog'
+import { Onboarding } from '@/components/Onboarding'
+import { SandboxSelector } from '@/components/SandboxSelector'
+import { ProfileDashboard } from '@/components/ProfileDashboard'
 
 function App() {
   const {
@@ -39,6 +48,26 @@ function App() {
     handleStartContainer,
     handleRemoveContainer,
     handleRemoveImage,
+    handleSaveDockerfile,
+    handleDeleteDockerfile,
+    handleBuildDockerfile,
+    savedDockerfiles,
+    currentNetworks,
+    activeChallenge,
+    activeChallengeAttempt,
+    challengeAttempts,
+    handleStartChallenge,
+    handleCompleteChallenge,
+    handleQuitChallenge,
+    handleComposeUp,
+    handleComposeDown,
+    hasRunningCompose,
+    handleImportSnapshot,
+    showOnboarding,
+    handleCompleteOnboarding,
+    handleLoadSandbox,
+    streakData,
+    dailyChallengeCompleted,
   } = useDockerState()
 
   const { theme, toggleTheme } = useTheme()
@@ -46,6 +75,10 @@ function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [tutorialsOpen, setTutorialsOpen] = useState(false)
   const [achievementsOpen, setAchievementsOpen] = useState(false)
+  const [challengesOpen, setChallengesOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [sandboxOpen, setSandboxOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   // Show achievement toasts when new achievements are unlocked
   const [lastAchievementCount, setLastAchievementCount] = useState(unlockedAchievements.length)
@@ -64,7 +97,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="terminal-grid fixed inset-0 opacity-20 pointer-events-none"></div>
+      <a href="#terminal-input" className="skip-nav">Skip to terminal</a>
+      <div className="terminal-grid fixed inset-0 opacity-20 pointer-events-none" aria-hidden="true"></div>
       
       <div className="relative">
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -97,6 +131,22 @@ function App() {
                 <Button onClick={() => setTutorialsOpen(true)} variant="default" size="sm" className="glow-primary" aria-label="View tutorials">
                   <GraduationCap weight="bold" />
                   <span className="hidden sm:inline">Tutorials</span>
+                </Button>
+                <Button onClick={() => setChallengesOpen(true)} variant="secondary" size="sm" aria-label="View challenges">
+                  <Trophy weight="bold" />
+                  <span className="hidden sm:inline">Challenges</span>
+                </Button>
+                <Button onClick={() => setExportOpen(true)} variant="secondary" size="sm" aria-label="Export & Share">
+                  <Export weight="bold" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+                <Button onClick={() => setSandboxOpen(true)} variant="secondary" size="sm" aria-label="Sandbox mode">
+                  <GameController weight="bold" />
+                  <span className="hidden sm:inline">Sandbox</span>
+                </Button>
+                <Button onClick={() => setProfileOpen(true)} variant="secondary" size="sm" aria-label="Profile">
+                  <User weight="bold" />
+                  <span className="hidden sm:inline">Profile</span>
                 </Button>
                 <Button onClick={() => setHelpOpen(true)} variant="outline" size="sm" aria-label="Show help">
                   <Question weight="bold" />
@@ -175,6 +225,18 @@ function App() {
                   onExit={handleExitTutorial}
                 />
               )}
+              <AnimatePresence>
+                {activeChallenge && activeChallengeAttempt && (
+                  <ChallengePanel
+                    challenge={activeChallenge}
+                    containers={currentContainers}
+                    images={currentImages}
+                    startedAt={activeChallengeAttempt.startedAt}
+                    onComplete={handleCompleteChallenge}
+                    onQuit={handleQuitChallenge}
+                  />
+                )}
+              </AnimatePresence>
               <div className="h-[400px] sm:h-[500px] lg:h-[600px]">
                 <Terminal lines={terminalLines} onCommand={handleCommand} containers={currentContainers} images={currentImages} />
               </div>
@@ -182,24 +244,36 @@ function App() {
 
             <div>
               <Tabs defaultValue="containers" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="containers" className="gap-2">
+                <TabsList className="grid w-full grid-cols-5 mb-4">
+                  <TabsTrigger value="containers" className="gap-1">
                     <Cube weight="duotone" />
-                    <span>Containers</span>
+                    <span className="hidden sm:inline">Containers</span>
                     {currentContainers.length > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-mono">
                         {currentContainers.length}
                       </span>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="images" className="gap-2">
+                  <TabsTrigger value="images" className="gap-1">
                     <StackIcon weight="duotone" />
-                    <span>Images</span>
+                    <span className="hidden sm:inline">Images</span>
                     {currentImages.length > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-xs font-mono">
                         {currentImages.length}
                       </span>
                     )}
+                  </TabsTrigger>
+                  <TabsTrigger value="dockerfile" className="gap-1">
+                    <FileCode weight="duotone" />
+                    <span className="hidden sm:inline">Build</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="compose" className="gap-1">
+                    <StackSimple weight="duotone" />
+                    <span className="hidden sm:inline">Compose</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="networks" className="gap-1">
+                    <ShareNetwork weight="duotone" />
+                    <span className="hidden sm:inline">Networks</span>
                   </TabsTrigger>
                 </TabsList>
 
@@ -254,6 +328,27 @@ function App() {
                     </AnimatePresence>
                   )}
                 </TabsContent>
+
+                <TabsContent value="dockerfile" className="h-[400px] sm:h-[480px] lg:h-[540px] overflow-y-auto pr-2 custom-scrollbar">
+                  <DockerfileEditor
+                    savedDockerfiles={savedDockerfiles}
+                    onSave={handleSaveDockerfile}
+                    onDelete={handleDeleteDockerfile}
+                    onBuild={handleBuildDockerfile}
+                  />
+                </TabsContent>
+
+                <TabsContent value="compose" className="h-[400px] sm:h-[480px] lg:h-[540px] overflow-y-auto pr-2 custom-scrollbar">
+                  <ComposeEditor
+                    onComposeUp={handleComposeUp}
+                    onComposeDown={handleComposeDown}
+                    hasRunningCompose={hasRunningCompose}
+                  />
+                </TabsContent>
+
+                <TabsContent value="networks" className="h-[400px] sm:h-[480px] lg:h-[540px] overflow-y-auto pr-2 custom-scrollbar">
+                  <NetworkGraph networks={currentNetworks} containers={currentContainers} />
+                </TabsContent>
               </Tabs>
             </div>
           </div>
@@ -278,7 +373,47 @@ function App() {
           totalCommandsExecuted: totalCommandsExecuted || 0
         }}
       />
+      <ChallengesDialog
+        open={challengesOpen}
+        onOpenChange={setChallengesOpen}
+        onStartChallenge={handleStartChallenge}
+        challengeAttempts={challengeAttempts}
+      />
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        terminalLines={terminalLines}
+        containers={currentContainers}
+        images={currentImages}
+        networks={currentNetworks}
+        tutorialProgresses={tutorialProgresses}
+        unlockedAchievements={unlockedAchievements}
+        totalCommandsExecuted={totalCommandsExecuted}
+        savedDockerfiles={savedDockerfiles}
+        onImportSnapshot={handleImportSnapshot}
+      />
+      <SandboxSelector
+        open={sandboxOpen}
+        onOpenChange={setSandboxOpen}
+        onLoadPreset={handleLoadSandbox}
+      />
+      <ProfileDashboard
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        unlockedAchievements={unlockedAchievements}
+        achievementData={{
+          tutorialProgresses,
+          containers: currentContainers,
+          images: currentImages,
+          totalCommandsExecuted,
+        }}
+        streakData={streakData}
+        dailyChallengeCompleted={dailyChallengeCompleted}
+      />
       <Toaster theme={theme} position="bottom-right" />
+      <AnimatePresence>
+        {showOnboarding && <Onboarding onComplete={handleCompleteOnboarding} />}
+      </AnimatePresence>
     </div>
   )
 }

@@ -177,3 +177,74 @@ body {
 #terminal-input::placeholder {
   color: var(--muted-foreground);
 }
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root,
+  [data-theme="dark"] {
+    --border: oklch(0.50 0.02 240);
+    --muted-foreground: oklch(0.75 0.04 240);
+  }
+  [data-theme="light"] {
+    --border: oklch(0.40 0.02 240);
+    --muted-foreground: oklch(0.35 0.04 240);
+  }
+}
+
+/* Forced colors (Windows high contrast) */
+@media (forced-colors: active) {
+  .glow-accent,
+  .glow-primary,
+  .glow-running {
+    box-shadow: none;
+  }
+}
+
+/* Focus visible improvements */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Skip navigation link */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: var(--background);
+  color: var(--foreground);
+  border: 2px solid var(--ring);
+  border-radius: var(--radius);
+}
+
+.skip-nav:focus {
+  top: 0.5rem;
+  left: 0.5rem;
+}

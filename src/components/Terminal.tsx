@@ -12,22 +12,25 @@ interface TerminalProps {
 }
 
 const DOCKER_SUBCOMMANDS = new Set([
-  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
+  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull', 'push',
   'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
   'history', 'system', 'prune', 'network', 'volume', 'cp',
-  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import'
+  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import',
+  'build', 'login', 'logout', 'search', 'service'
 ])
 
 const COMPLETABLE_SUBCOMMANDS = [
-  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull',
+  'run', 'ps', 'images', 'stop', 'start', 'rm', 'rmi', 'pull', 'push',
   'exec', 'logs', 'inspect', 'rename', 'pause', 'unpause', 'tag',
   'history', 'system', 'network', 'volume', 'cp',
-  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import'
+  'commit', 'stats', 'top', 'diff', 'port', 'save', 'load', 'export', 'import',
+  'build', 'login', 'logout', 'search', 'service'
 ]
 
 const NETWORK_SUBCOMMANDS = ['create', 'ls', 'rm', 'connect', 'disconnect']
 const VOLUME_SUBCOMMANDS = ['create', 'ls', 'rm']
 const SYSTEM_SUBCOMMANDS = ['prune']
+const SERVICE_SUBCOMMANDS = ['create', 'ls', 'rm', 'scale', 'update', 'inspect']
 
 function getCompletions(
   input: string,
@@ -67,6 +70,12 @@ function getCompletions(
   if (sub === 'system' && parts.length === 3) {
     const partial = parts[2]
     return SYSTEM_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
+  }
+
+  // "docker service <sub>"
+  if (sub === 'service' && parts.length === 3) {
+    const partial = parts[2]
+    return SERVICE_SUBCOMMANDS.filter(s => s.startsWith(partial) && s !== partial)
   }
 
   // Complete container names for commands that take containers
@@ -246,7 +255,7 @@ export function Terminal({ lines, onCommand, containers = [], images = [] }: Ter
         <span className="ml-auto text-xs text-muted-foreground font-mono">Type 'help' for commands</span>
       </div>
 
-      <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto custom-scrollbar" role="log" aria-label="Terminal output">
+      <div ref={scrollRef} className="flex-1 p-4 overflow-y-auto custom-scrollbar" role="log" aria-label="Terminal output" aria-live="polite">
         <div className="space-y-1 font-mono text-sm">
           <AnimatePresence initial={false}>
             {lines.map((line) => (
@@ -265,7 +274,7 @@ export function Terminal({ lines, onCommand, containers = [], images = [] }: Ter
                     : 'text-foreground/80 pl-4 whitespace-pre-wrap'
                 }
               >
-                {line.type === 'command' && <span className="text-muted-foreground select-none">$</span>}
+                {line.type === 'command' && <span className="text-muted-foreground select-none" aria-hidden="true">$</span>}
                 <span className="flex-1">
                   {line.type === 'command' ? highlightCommand(line.content) : line.content}
                 </span>
@@ -293,7 +302,7 @@ export function Terminal({ lines, onCommand, containers = [], images = [] }: Ter
           </div>
         )}
         <div className="flex items-center gap-2 relative">
-          <span className="text-muted-foreground font-mono text-sm select-none">$</span>
+          <span className="text-muted-foreground font-mono text-sm select-none" aria-hidden="true">$</span>
           <div className="relative flex-1">
             <div
               aria-hidden

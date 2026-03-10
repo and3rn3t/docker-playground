@@ -1010,6 +1010,296 @@ export const tutorials: Tutorial[] = [
         successMessage: 'Well done! You now understand how to configure containers with environment variables — a fundamental Docker skill.'
       }
     ]
+  },
+  {
+    id: 'dockerfile-basics',
+    title: 'Building Images with Dockerfiles',
+    description: 'Learn to write Dockerfiles and build custom images using docker build.',
+    difficulty: 'intermediate',
+    estimatedTime: '10 min',
+    icon: 'file-code',
+    steps: [
+      {
+        id: 'pull-base',
+        title: 'Pull a base image',
+        description: 'Dockerfiles start with a FROM instruction. Let\'s pull the base image we\'ll build on.',
+        expectedCommand: ['docker pull node:20-alpine', 'docker pull node'],
+        hints: [
+          'Pull the Node.js alpine image',
+          'Try: docker pull node:20-alpine'
+        ],
+        successMessage: 'Base image ready! In a real Dockerfile, FROM node:20-alpine would be your first line.'
+      },
+      {
+        id: 'build-basic',
+        title: 'Build your first image',
+        description: 'Use docker build to create an image from a Dockerfile. Use the -t flag to name your image.',
+        expectedCommand: ['docker build -t myapp .', 'docker build -t myapp:latest .'],
+        hints: [
+          'Use docker build with the -t flag',
+          'Try: docker build -t myapp .'
+        ],
+        successMessage: 'You built your first image! The -t flag tags your image with a name.'
+      },
+      {
+        id: 'build-tagged',
+        title: 'Build with a version tag',
+        description: 'Tag your image with a version number using the name:tag format.',
+        expectedCommand: ['docker build -t myapp:v1 .', 'docker build -t myapp:v2 .'],
+        hints: [
+          'Use the name:tag format with -t',
+          'Try: docker build -t myapp:v1 .'
+        ],
+        successMessage: 'Version-tagged build complete! Always tag images with meaningful versions.'
+      },
+      {
+        id: 'verify-build',
+        title: 'Verify the built image',
+        description: 'List images to see your newly created image.',
+        expectedCommand: ['docker images'],
+        hints: [
+          'Use docker images to list all images'
+        ],
+        validation: (state) => state.images.some(i => i.name === 'myapp'),
+        successMessage: 'There it is! Your custom image is ready to run.'
+      },
+      {
+        id: 'run-built',
+        title: 'Run your custom image',
+        description: 'Create a container from your custom-built image.',
+        expectedCommand: ['docker run -d --name myapp-container myapp', 'docker run -d --name myapp-container myapp:v1', 'docker run -d --name myapp-container myapp:latest'],
+        hints: [
+          'Run the image you built with docker run',
+          'Try: docker run -d --name myapp-container myapp:v1'
+        ],
+        validation: (state) => state.containers.some(c => c.name === 'myapp-container'),
+        successMessage: 'Your custom image is now running as a container! You\'ve mastered the build-to-run workflow.'
+      }
+    ]
+  },
+  {
+    id: 'compose-quickstart',
+    title: 'Docker Compose Quickstart',
+    description: 'Learn to manage multi-container applications with Docker Compose — all from the terminal.',
+    difficulty: 'intermediate',
+    estimatedTime: '8 min',
+    icon: 'stack-simple',
+    steps: [
+      {
+        id: 'create-network',
+        title: 'Create an application network',
+        description: 'Multi-service apps need a shared network so containers can talk to each other.',
+        expectedCommand: ['docker network create app-net'],
+        hints: [
+          'Use docker network create',
+          'Try: docker network create app-net'
+        ],
+        successMessage: 'Network created! Containers on the same network can communicate by name.'
+      },
+      {
+        id: 'run-db',
+        title: 'Start the database service',
+        description: 'Launch a PostgreSQL database on the app network — just like Compose would.',
+        expectedCommand: ['docker run -d --name db --network app-net -e POSTGRES_PASSWORD=secret postgres:16'],
+        hints: [
+          'Run postgres with --network, --name, and -e flags',
+          'Try: docker run -d --name db --network app-net -e POSTGRES_PASSWORD=secret postgres:16'
+        ],
+        validation: (state) => state.containers.some(c => c.name === 'db' && c.status === 'running'),
+        successMessage: 'Database is running! In Compose, this would be defined as a service in your YAML file.'
+      },
+      {
+        id: 'run-web',
+        title: 'Start the web service',
+        description: 'Launch an nginx web server on the same network, with port 8080 exposed.',
+        expectedCommand: ['docker run -d --name web --network app-net -p 8080:80 nginx:latest', 'docker run -d --name web --network app-net -p 8080:80 nginx'],
+        hints: [
+          'Run nginx on the same network with a port mapping',
+          'Try: docker run -d --name web --network app-net -p 8080:80 nginx:latest'
+        ],
+        validation: (state) => state.containers.some(c => c.name === 'web' && c.status === 'running'),
+        successMessage: 'Web server running! Both services are on the same network and can communicate.'
+      },
+      {
+        id: 'verify-network',
+        title: 'Verify network connectivity',
+        description: 'List the networks to see your custom network with connected containers.',
+        expectedCommand: ['docker network ls'],
+        hints: [
+          'Use docker network ls to list networks'
+        ],
+        successMessage: 'You can see your app-net network. In Compose, networks are auto-managed.'
+      },
+      {
+        id: 'cleanup',
+        title: 'Tear down the stack',
+        description: 'Stop and remove both containers — Compose Down in manual mode. Then use the Compose tab for the real thing!',
+        expectedCommand: ['docker rm -f db web', 'docker rm -f web db'],
+        hints: [
+          'Force-remove both containers with docker rm -f',
+          'Try: docker rm -f db web'
+        ],
+        validation: (state) => !state.containers.some(c => ['db', 'web'].includes(c.name)),
+        successMessage: 'Stack torn down! Now try the Compose tab to do all this with a single YAML file.'
+      }
+    ]
+  },
+  {
+    id: 'advanced-networking',
+    title: 'Advanced Docker Networking',
+    description: 'Master multi-network architectures with isolated frontend and backend networks.',
+    difficulty: 'advanced',
+    estimatedTime: '12 min',
+    icon: 'share-network',
+    steps: [
+      {
+        id: 'create-frontend-net',
+        title: 'Create a frontend network',
+        description: 'Create a separate network for public-facing services.',
+        expectedCommand: ['docker network create frontend'],
+        hints: [
+          'docker network create frontend'
+        ],
+        successMessage: 'Frontend network created! This will isolate public traffic.'
+      },
+      {
+        id: 'create-backend-net',
+        title: 'Create a backend network',
+        description: 'Create a private network for internal services.',
+        expectedCommand: ['docker network create backend'],
+        hints: [
+          'docker network create backend'
+        ],
+        successMessage: 'Backend network created! Internal services will be isolated here.'
+      },
+      {
+        id: 'run-proxy',
+        title: 'Deploy the reverse proxy',
+        description: 'Run an nginx proxy on the frontend network with port 80 exposed.',
+        expectedCommand: ['docker run -d --name proxy --network frontend -p 80:80 nginx:latest', 'docker run -d --name proxy --network frontend -p 80:80 nginx'],
+        hints: [
+          'Run nginx on the frontend network',
+          'Try: docker run -d --name proxy --network frontend -p 80:80 nginx:latest'
+        ],
+        validation: (state) => state.containers.some(c => c.name === 'proxy' && c.status === 'running'),
+        successMessage: 'Proxy deployed! It can only talk to other frontend containers for now.'
+      },
+      {
+        id: 'run-api',
+        title: 'Deploy the API server',
+        description: 'Run a Node.js API on the backend network.',
+        expectedCommand: ['docker run -d --name api --network backend node:20-alpine'],
+        hints: [
+          'Run node on the backend network',
+          'Try: docker run -d --name api --network backend node:20-alpine'
+        ],
+        validation: (state) => state.containers.some(c => c.name === 'api' && c.status === 'running'),
+        successMessage: 'API deployed on backend. The proxy can\'t reach it yet — they\'re on different networks!'
+      },
+      {
+        id: 'connect-api-frontend',
+        title: 'Bridge the proxy to backend',
+        description: 'Connect the proxy to the backend network so it can reach the API.',
+        expectedCommand: ['docker network connect backend proxy'],
+        hints: [
+          'Use docker network connect to add proxy to the backend network',
+          'Try: docker network connect backend proxy'
+        ],
+        successMessage: 'Now the proxy is on both networks and can route traffic to the API!'
+      },
+      {
+        id: 'run-database',
+        title: 'Deploy the database',
+        description: 'Run PostgreSQL on only the backend network — it should never be publicly accessible.',
+        expectedCommand: ['docker run -d --name database --network backend -e POSTGRES_PASSWORD=secret postgres:16'],
+        hints: [
+          'Run postgres on the backend network with POSTGRES_PASSWORD env',
+          'Try: docker run -d --name database --network backend -e POSTGRES_PASSWORD=secret postgres:16'
+        ],
+        validation: (state) => state.containers.some(c => c.name === 'database' && c.status === 'running'),
+        successMessage: 'Database is isolated on the backend network — secure by design!'
+      },
+      {
+        id: 'verify-topology',
+        title: 'Review the network topology',
+        description: 'List your networks to see the multi-network architecture. Check the Networks tab!',
+        expectedCommand: ['docker network ls'],
+        hints: [
+          'Use docker network ls'
+        ],
+        successMessage: 'Excellent! You\'ve built a production-style network architecture with isolated networks. The proxy bridges frontend to backend.'
+      }
+    ]
+  },
+  {
+    id: 'image-management',
+    title: 'Image Management & Optimization',
+    description: 'Learn advanced image management: tagging strategies, building, and cleanup.',
+    difficulty: 'advanced',
+    estimatedTime: '10 min',
+    icon: 'stack',
+    steps: [
+      {
+        id: 'pull-alpine',
+        title: 'Pull a lightweight base',
+        description: 'Alpine images are tiny. Pull alpine:latest to use as a build base.',
+        expectedCommand: ['docker pull alpine:latest', 'docker pull alpine'],
+        hints: [
+          'docker pull alpine:latest'
+        ],
+        successMessage: 'Alpine is one of the smallest base images — great for production!'
+      },
+      {
+        id: 'tag-dev',
+        title: 'Create a development tag',
+        description: 'Tag the alpine image for your development workflow.',
+        expectedCommand: ['docker tag alpine:latest myproject:dev'],
+        hints: [
+          'docker tag alpine:latest myproject:dev'
+        ],
+        successMessage: 'Tagged! The dev tag lets your team know this is a development build.'
+      },
+      {
+        id: 'tag-staging',
+        title: 'Create a staging tag',
+        description: 'Tag the same image for staging to simulate a promotion pipeline.',
+        expectedCommand: ['docker tag alpine:latest myproject:staging'],
+        hints: [
+          'docker tag alpine:latest myproject:staging'
+        ],
+        successMessage: 'Staging tag created! In CI/CD, images get promoted through tags.'
+      },
+      {
+        id: 'build-production',
+        title: 'Build the production image',
+        description: 'Build a production-tagged image using docker build.',
+        expectedCommand: ['docker build -t myproject:prod .', 'docker build -t myproject:production .'],
+        hints: [
+          'docker build -t myproject:prod .'
+        ],
+        successMessage: 'Production image built! You now have dev, staging, and prod versions.'
+      },
+      {
+        id: 'check-history',
+        title: 'Inspect image layers',
+        description: 'Use docker history to see the layers that make up your image.',
+        expectedCommand: ['docker history myproject:prod', 'docker history myproject:dev', 'docker history alpine:latest'],
+        hints: [
+          'docker history myproject:prod'
+        ],
+        successMessage: 'Understanding layers helps you optimize image size. Each instruction creates a layer.'
+      },
+      {
+        id: 'system-prune',
+        title: 'Clean up unused resources',
+        description: 'Use system prune to remove stopped containers and unused images.',
+        expectedCommand: ['docker system prune'],
+        hints: [
+          'docker system prune'
+        ],
+        successMessage: 'System pruned! Regular cleanup keeps your Docker environment lean and fast.'
+      }
+    ]
   }
 ]
 

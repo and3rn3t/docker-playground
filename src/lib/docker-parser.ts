@@ -1,10 +1,13 @@
-import { DockerContainer, DockerImage, DockerNetwork, DockerVolume, CommandResult } from './types'
+import { DockerContainer, DockerImage, DockerNetwork, DockerVolume, DockerService, CommandResult } from './types'
+import { simulateBuild } from './dockerfile-parser'
+import { searchCatalog } from './image-catalog'
 
 export interface DockerState {
   containers: DockerContainer[]
   images: DockerImage[]
   networks: DockerNetwork[]
   volumes: DockerVolume[]
+  services?: DockerService[]
 }
 
 export function parseCommand(
@@ -111,6 +114,18 @@ export function parseCommand(
       return handleExport(parts, state)
     case 'import':
       return handleImport(parts, state, updateState)
+    case 'build':
+      return handleBuild(parts, state, updateState)
+    case 'push':
+      return handlePush(parts, state)
+    case 'login':
+      return handleLogin(parts)
+    case 'logout':
+      return handleLogout()
+    case 'search':
+      return handleSearch(parts)
+    case 'service':
+      return handleService(parts, state, updateState)
     default:
       return {
         success: false,
@@ -1217,6 +1232,82 @@ function handleImport(parts: string[], state: DockerState, updateState: (newStat
   }
 }
 
+function handleBuild(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  let tag = ''
+  let dockerfileContent = ''
+  let noCache = false
+
+  for (let i = 2; i < parts.length; i++) {
+    const part = parts[i]
+    if (part === '-t' || part === '--tag') {
+      tag = parts[++i] || ''
+      continue
+    }
+    if (part === '--no-cache') {
+      noCache = true
+      continue
+    }
+    if (part === '-f' || part === '--file') {
+      i++ // skip filename — we use the active Dockerfile from state
+      continue
+    }
+  }
+
+  if (!tag) {
+    return { success: false, output: '', error: 'docker build: -t flag is required. Usage: docker build -t IMAGE[:TAG] .' }
+  }
+
+  // Check if there is a saved active Dockerfile
+  // The dockerfileContent will be provided via the build integration in the UI,
+  // but via the CLI we generate a minimal placeholder so tests can work
+  if (!dockerfileContent) {
+    dockerfileContent = `FROM ${tag.split(':')[0] || 'ubuntu'}:latest\nRUN echo "built from CLI"`
+  }
+
+  const result = simulateBuild(dockerfileContent, tag)
+
+  if (!result.success) {
+    return { success: false, output: '', error: result.errors.join('\n') }
+  }
+
+  // Check for existing image with same name:tag
+  const existingIdx = state.images.findIndex(
+    img => img.name === result.imageName && img.tag === result.imageTag
+  )
+
+  const newImage: DockerImage = {
+    id: generateId(),
+    name: result.imageName,
+    tag: result.imageTag,
+    size: result.totalSize,
+    created: Date.now(),
+    layers: result.steps
+      .filter(s => ['FROM', 'RUN', 'COPY', 'ADD'].includes(s.instruction))
+      .map(s => s.layerId),
+  }
+
+  const images = existingIdx >= 0
+    ? state.images.map((img, idx) => idx === existingIdx ? newImage : img)
+    : [...state.images, newImage]
+
+  updateState({ ...state, images })
+
+  const stepLines = result.steps.map((s, i) => {
+    const cached = !noCache && s.cached ? ' CACHED' : ''
+    return `Step ${i + 1}/${result.steps.length} : ${s.instruction} ${s.args}${cached}\n ---> ${s.layerId}`
+  })
+
+  return {
+    success: true,
+    output: [
+      `Sending build context to Docker daemon  2.048kB`,
+      ...stepLines,
+      `Successfully built ${newImage.id.substring(0, 12)}`,
+      `Successfully tagged ${result.imageName}:${result.imageTag}`,
+    ].join('\n'),
+  }
+}
+
 function findContainer(ref: string, containers: DockerContainer[]): DockerContainer | undefined {
   return containers.find(c => 
     c.id.startsWith(ref) || 
@@ -1258,6 +1349,198 @@ function formatTimestamp(timestamp: number): string {
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
+function handlePush(parts: string[], state: DockerState): CommandResult {
+  const imageRef = parts[2]
+  if (!imageRef) {
+    return { success: false, output: '', error: 'docker push: image name required' }
+  }
+  const [name, tag = 'latest'] = imageRef.split(':')
+  const image = state.images.find(img => img.name === name && img.tag === tag)
+  if (!image) {
+    return { success: false, output: '', error: `An image does not exist locally with the tag: ${name}:${tag}` }
+  }
+  const digest = `sha256:${generateId()}${generateId()}`
+  const layers = image.layers.map(l => `${l}: Pushed`).join('\n')
+  return {
+    success: true,
+    output: `The push refers to repository [docker.io/library/${name}]\n${layers}\n${tag}: digest: ${digest} size: ${Math.floor(Math.random() * 5000) + 1000}`,
+  }
+}
+
+function handleLogin(_parts: string[]): CommandResult {
+  return {
+    success: true,
+    output: 'Login Succeeded (simulated)',
+  }
+}
+
+function handleLogout(): CommandResult {
+  return {
+    success: true,
+    output: 'Removing login credentials for https://index.docker.io/v1/\nLogout Succeeded (simulated)',
+  }
+}
+
+function handleSearch(parts: string[]): CommandResult {
+  const query = parts[2]
+  if (!query) {
+    return { success: false, output: '', error: 'docker search: search term required' }
+  }
+  const results = searchCatalog(query)
+  if (results.length === 0) {
+    return { success: true, output: 'No results found.' }
+  }
+  const header = 'NAME'.padEnd(25) + 'DESCRIPTION'.padEnd(50) + 'STARS'.padEnd(8) + 'OFFICIAL'
+  const rows = results.map(img => {
+    const desc = img.description.length > 47 ? img.description.substring(0, 47) + '...' : img.description
+    return img.name.padEnd(25) + desc.padEnd(50) + img.pulls.padEnd(8) + (img.official ? '[OK]' : '')
+  })
+  return { success: true, output: [header, ...rows].join('\n') }
+}
+
+function handleService(parts: string[], state: DockerState, updateState: (newState: DockerState) => void): CommandResult {
+  const subCmd = parts[2]
+  const services = state.services || []
+
+  if (!subCmd || subCmd === '--help') {
+    return {
+      success: true,
+      output: 'Usage:  docker service COMMAND\n\nCommands:\n  create    Create a new service\n  ls        List services\n  rm        Remove a service\n  scale     Scale a service\n  update    Update a service\n  inspect   Show service details',
+    }
+  }
+
+  switch (subCmd) {
+    case 'create': {
+      let name = ''
+      let image = ''
+      let replicas = 1
+      const ports: string[] = []
+
+      for (let i = 3; i < parts.length; i++) {
+        if (parts[i] === '--name' && parts[i + 1]) { name = parts[++i]; continue }
+        if (parts[i] === '--replicas' && parts[i + 1]) { replicas = parseInt(parts[++i], 10) || 1; continue }
+        if ((parts[i] === '-p' || parts[i] === '--publish') && parts[i + 1]) { ports.push(parts[++i]); continue }
+        if (!parts[i].startsWith('-')) image = parts[i]
+      }
+
+      if (!image) return { success: false, output: '', error: 'docker service create: image required' }
+      if (!name) name = `${image.split(':')[0]}_svc`
+      if (services.find(s => s.name === name)) {
+        return { success: false, output: '', error: `service ${name} already exists` }
+      }
+
+      const newService: DockerService = {
+        id: generateId().substring(0, 25),
+        name,
+        image,
+        replicas,
+        desiredReplicas: replicas,
+        ports,
+        created: Date.now(),
+      }
+
+      updateState({ ...state, services: [...services, newService] })
+
+      return {
+        success: true,
+        output: `${newService.id}\nService ${name} created with ${replicas} replica(s)\nimage: ${image}${ports.length ? '\npublished: ' + ports.join(', ') : ''}`,
+      }
+    }
+
+    case 'ls': {
+      if (services.length === 0) return { success: true, output: 'ID    NAME    MODE    REPLICAS    IMAGE    PORTS' }
+      const header = 'ID'.padEnd(14) + 'NAME'.padEnd(20) + 'MODE'.padEnd(14) + 'REPLICAS'.padEnd(12) + 'IMAGE'.padEnd(25) + 'PORTS'
+      const rows = services.map(s => {
+        return s.id.substring(0, 12).padEnd(14) +
+          s.name.padEnd(20) +
+          'replicated'.padEnd(14) +
+          `${s.replicas}/${s.desiredReplicas}`.padEnd(12) +
+          s.image.padEnd(25) +
+          s.ports.join(', ')
+      })
+      return { success: true, output: [header, ...rows].join('\n') }
+    }
+
+    case 'rm': {
+      const svcName = parts[3]
+      if (!svcName) return { success: false, output: '', error: 'docker service rm: service name required' }
+      const idx = services.findIndex(s => s.name === svcName || s.id.startsWith(svcName))
+      if (idx < 0) return { success: false, output: '', error: `no such service: ${svcName}` }
+      const removed = services[idx]
+      updateState({ ...state, services: services.filter((_, i) => i !== idx) })
+      return { success: true, output: `${removed.name}\nService ${removed.name} removed` }
+    }
+
+    case 'scale': {
+      const scaleArg = parts[3] // format: name=N
+      if (!scaleArg || !scaleArg.includes('=')) {
+        return { success: false, output: '', error: 'Usage: docker service scale SERVICE=REPLICAS' }
+      }
+      const [svcName, countStr] = scaleArg.split('=')
+      const count = parseInt(countStr, 10)
+      if (isNaN(count) || count < 0) return { success: false, output: '', error: 'invalid replica count' }
+      const svc = services.find(s => s.name === svcName)
+      if (!svc) return { success: false, output: '', error: `no such service: ${svcName}` }
+      const oldReplicas = svc.desiredReplicas
+      updateState({
+        ...state,
+        services: services.map(s => s.name === svcName
+          ? { ...s, replicas: count, desiredReplicas: count }
+          : s
+        ),
+      })
+      return {
+        success: true,
+        output: `${svcName} scaled to ${count}\n(was ${oldReplicas} → now ${count} replica${count !== 1 ? 's' : ''})`,
+      }
+    }
+
+    case 'update': {
+      const svcName = parts[3]
+      if (!svcName) return { success: false, output: '', error: 'docker service update: service name required' }
+      const svc = services.find(s => s.name === svcName || s.id.startsWith(svcName))
+      if (!svc) return { success: false, output: '', error: `no such service: ${svcName}` }
+
+      let newImage = svc.image
+      for (let i = 4; i < parts.length; i++) {
+        if (parts[i] === '--image' && parts[i + 1]) { newImage = parts[++i]; continue }
+      }
+
+      updateState({
+        ...state,
+        services: services.map(s => s.name === svc.name
+          ? { ...s, image: newImage, updateState: 'completed' }
+          : s
+        ),
+      })
+      return {
+        success: true,
+        output: `${svc.name}\nService ${svc.name} updated${newImage !== svc.image ? ` (image: ${svc.image} → ${newImage})` : ''}\nupdate: rolling update completed`,
+      }
+    }
+
+    case 'inspect': {
+      const svcName = parts[3]
+      if (!svcName) return { success: false, output: '', error: 'docker service inspect: service name required' }
+      const svc = services.find(s => s.name === svcName || s.id.startsWith(svcName))
+      if (!svc) return { success: false, output: '', error: `no such service: ${svcName}` }
+      const info = JSON.stringify({
+        ID: svc.id,
+        Name: svc.name,
+        Image: svc.image,
+        Replicas: `${svc.replicas}/${svc.desiredReplicas}`,
+        Ports: svc.ports,
+        CreatedAt: new Date(svc.created).toISOString(),
+        UpdateState: svc.updateState || 'none',
+      }, null, 2)
+      return { success: true, output: `[\n${info}\n]` }
+    }
+
+    default:
+      return { success: false, output: '', error: `docker service: unknown subcommand '${subCmd}'` }
+  }
+}
+
 function getHelpText(): string {
   return `Docker Playground - Available Commands:
 
@@ -1288,11 +1571,14 @@ Container Commands:
 Image Commands:
   docker images               List all images
   docker pull IMAGE[:TAG]     Pull an image (creates simulated image)
+  docker push IMAGE[:TAG]     Push an image to registry (simulated)
   docker rmi IMAGE            Remove an image
   docker tag SOURCE TARGET    Create a tag TARGET from SOURCE image
   docker history IMAGE        Show image layer history
+  docker build -t NAME .      Build image from Dockerfile
   docker save IMAGE           Save image to a tar archive
   docker load -i FILE         Load image from a tar archive
+  docker search TERM          Search Docker Hub for images
 
 Network Commands:
   docker network create NAME  Create a new network
@@ -1309,6 +1595,19 @@ Volume Commands:
 Inspect & System:
   docker inspect NAME/ID      Show detailed information
   docker system prune         Remove stopped containers and unused images
+
+Registry Commands:
+  docker login                Log in to a Docker registry (simulated)
+  docker logout               Log out from a Docker registry (simulated)
+
+Service Commands (Swarm concepts):
+  docker service create       Create a new service
+    Options: --name NAME, --replicas N, -p HOST:CONTAINER
+  docker service ls           List services
+  docker service rm SERVICE   Remove a service
+  docker service scale SVC=N  Scale a service to N replicas
+  docker service update SVC   Update a service (--image IMAGE)
+  docker service inspect SVC  Show service details
 
 Other:
   help                        Show this help message
@@ -1333,6 +1632,10 @@ Examples:
   docker network connect my-net web
   docker volume create my-data
   docker cp web:/etc/nginx/nginx.conf ./nginx.conf
+  docker build -t myapp:v1 .
+  docker search nginx
+  docker push myapp:v1
+  docker login
   docker system prune`
 }
 
