@@ -14,7 +14,6 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@github/spark": ">=0.43.1 <1",
         "@phosphor-icons/react": "^2.1.7",
         "@radix-ui/colors": "^3.0.0",
         "@radix-ui/react-dialog": "^1.1.6",

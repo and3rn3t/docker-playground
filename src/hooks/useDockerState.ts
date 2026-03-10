@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorageState as useKV } from './useLocalStorageState'
 import {
   DockerContainer,
   DockerImage,

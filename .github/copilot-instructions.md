@@ -9,7 +9,7 @@ Docker Playground is an interactive web application that **simulates** Docker co
 - **Framework**: React 19 + TypeScript + Vite 7
 - **Styling**: Tailwind CSS v4 with custom theme (theme.json → CSS variables)
 - **UI Components**: Radix UI primitives + shadcn/ui pattern (`src/components/ui/`)
-- **State**: GitHub Spark `useKV` hook for persistent state, React `useState` for ephemeral state
+- **State**: `useLocalStorageState` hook for persistent state, React `useState` for ephemeral state
 - **Animation**: Framer Motion
 - **Icons**: Phosphor Icons (`@phosphor-icons/react`)
 - **Path alias**: `@/` maps to `src/`
@@ -55,7 +55,7 @@ Supported commands: `docker run`, `docker ps`, `docker images`, `docker stop`, `
 
 ## State Management
 
-- **Persistent state** (survives refresh): Use `useKV<T>(key, defaultValue)` from `@github/spark/hooks`
+- **Persistent state** (survives refresh): Use `useLocalStorageState<T>(key, defaultValue)` from `@/hooks/useLocalStorageState`
 - **Ephemeral state** (session only): Use React `useState`
 - Key KV keys: `docker-containers`, `docker-images`, `tutorial-progresses`, `active-tutorial`, `unlocked-achievements`, `total-commands-executed`
 

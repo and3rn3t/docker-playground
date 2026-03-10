@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorageState as useKV } from './useLocalStorageState'
 
 export type Theme = 'dark' | 'light'
 
