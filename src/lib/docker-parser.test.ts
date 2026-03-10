@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { parseCommand, DockerState, getInitialImages, getInitialNetworks } from './docker-parser'
-import { DockerContainer, DockerImage, DockerNetwork, DockerVolume } from './types'
+import { DockerContainer, DockerImage, DockerNetwork, DockerService, DockerVolume } from './types'
 
 function makeState(overrides?: Partial<DockerState>): DockerState {
   return {
@@ -8,6 +8,7 @@ function makeState(overrides?: Partial<DockerState>): DockerState {
     images: overrides?.images ?? getInitialImages(),
     networks: overrides?.networks ?? getInitialNetworks(),
     volumes: overrides?.volumes ?? [],
+    services: overrides?.services ?? [],
   }
 }
 
@@ -1139,6 +1140,431 @@ describe('parseCommand', () => {
       expect(result.success).toBe(true)
       const created = updateState.mock.calls[0][0].containers.at(-1)
       expect(created.networks).toEqual(['bridge'])
+    })
+  })
+
+  describe('docker commit', () => {
+    it('creates a new image from a container', () => {
+      const updateState = vi.fn()
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker commit test-container myimage:v1', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('sha256:')
+      const newImages = updateState.mock.calls[0][0].images
+      expect(newImages.some((i: DockerImage) => i.name === 'myimage' && i.tag === 'v1')).toBe(true)
+    })
+
+    it('rejects commit of non-existent container', () => {
+      const result = parseCommand('docker commit nonexistent myimage', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('rejects commit to existing image name:tag', () => {
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker commit test-container nginx:latest', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already exists')
+    })
+
+    it('requires both container and image args', () => {
+      const result = parseCommand('docker commit test-container', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('requires')
+    })
+  })
+
+  describe('docker stats', () => {
+    it('shows stats for running containers', () => {
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker stats', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('CONTAINER ID')
+      expect(result.output).toContain('CPU')
+    })
+
+    it('shows empty message when no running containers', () => {
+      const result = parseCommand('docker stats', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('No running containers')
+    })
+  })
+
+  describe('docker top', () => {
+    it('shows processes in a running container', () => {
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker top test-container', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('PID')
+      expect(result.output).toContain('CMD')
+    })
+
+    it('rejects top on a stopped container', () => {
+      const state = makeState({ containers: [makeContainer({ status: 'stopped' })] })
+      const result = parseCommand('docker top test-container', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('not running')
+    })
+
+    it('rejects top on non-existent container', () => {
+      const result = parseCommand('docker top nonexistent', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('requires container name', () => {
+      const result = parseCommand('docker top', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker diff', () => {
+    it('shows filesystem changes for a container', () => {
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker diff test-container', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('C /var')
+      expect(result.output).toContain('A /var/log/app.log')
+    })
+
+    it('rejects diff on non-existent container', () => {
+      const result = parseCommand('docker diff nonexistent', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('requires container name', () => {
+      const result = parseCommand('docker diff', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker port', () => {
+    it('shows port mappings for a container', () => {
+      const state = makeState({ containers: [makeContainer({ ports: ['8080:80'] })] })
+      const result = parseCommand('docker port test-container', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('80/tcp -> 0.0.0.0:8080')
+    })
+
+    it('shows empty output for container with no ports', () => {
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker port test-container', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toBe('')
+    })
+
+    it('rejects port on non-existent container', () => {
+      const result = parseCommand('docker port nonexistent', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('requires container name', () => {
+      const result = parseCommand('docker port', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker save', () => {
+    it('saves an existing image', () => {
+      const result = parseCommand('docker save nginx:latest', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Saved image nginx:latest')
+    })
+
+    it('rejects saving non-existent image', () => {
+      const result = parseCommand('docker save nonexistent', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such image')
+    })
+
+    it('requires image name', () => {
+      const result = parseCommand('docker save', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker load', () => {
+    it('loads an image with -i flag', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker load -i backup.tar', makeState(), updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Loaded image')
+      const newImages = updateState.mock.calls[0][0].images
+      expect(newImages.some((i: DockerImage) => i.name === 'loaded-image')).toBe(true)
+    })
+
+    it('requires -i flag or input', () => {
+      const result = parseCommand('docker load', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('requires')
+    })
+  })
+
+  describe('docker export', () => {
+    it('exports a container filesystem', () => {
+      const state = makeState({ containers: [makeContainer()] })
+      const result = parseCommand('docker export test-container', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Exported container')
+    })
+
+    it('rejects exporting non-existent container', () => {
+      const result = parseCommand('docker export nonexistent', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('No such container')
+    })
+
+    it('requires container name', () => {
+      const result = parseCommand('docker export', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker import', () => {
+    it('imports a tarball with custom name', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker import archive.tar myimage:v2', makeState(), updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('sha256:')
+      const newImages = updateState.mock.calls[0][0].images
+      expect(newImages.some((i: DockerImage) => i.name === 'myimage' && i.tag === 'v2')).toBe(true)
+    })
+
+    it('uses default name when none provided', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker import archive.tar', makeState(), updateState)
+      expect(result.success).toBe(true)
+      const newImages = updateState.mock.calls[0][0].images
+      expect(newImages.some((i: DockerImage) => i.name === 'imported-image')).toBe(true)
+    })
+
+    it('requires file argument', () => {
+      const result = parseCommand('docker import', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('requires')
+    })
+  })
+
+  describe('docker build', () => {
+    it('builds an image with -t flag', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker build -t myapp:latest .', makeState(), updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Successfully tagged myapp:latest')
+      const newImages = updateState.mock.calls[0][0].images
+      expect(newImages.some((i: DockerImage) => i.name === 'myapp' && i.tag === 'latest')).toBe(true)
+    })
+
+    it('requires -t flag', () => {
+      const result = parseCommand('docker build .', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('-t flag is required')
+    })
+
+    it('replaces existing image with same name:tag', () => {
+      const updateState = vi.fn()
+      const state = makeState({ images: [makeImage({ name: 'myapp', tag: 'latest' })] })
+      const result = parseCommand('docker build -t myapp:latest .', state, updateState)
+      expect(result.success).toBe(true)
+      const updatedImages = updateState.mock.calls[0][0].images
+      const myappImages = updatedImages.filter((i: DockerImage) => i.name === 'myapp' && i.tag === 'latest')
+      expect(myappImages.length).toBe(1)
+    })
+  })
+
+  describe('docker push', () => {
+    it('pushes an existing image', () => {
+      const result = parseCommand('docker push nginx:latest', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('docker.io/library/nginx')
+      expect(result.output).toContain('Pushed')
+    })
+
+    it('rejects pushing non-existent image', () => {
+      const result = parseCommand('docker push nonexistent:latest', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('does not exist locally')
+    })
+
+    it('requires image name', () => {
+      const result = parseCommand('docker push', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker login / logout', () => {
+    it('login succeeds', () => {
+      const result = parseCommand('docker login', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Login Succeeded')
+    })
+
+    it('logout succeeds', () => {
+      const result = parseCommand('docker logout', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Logout Succeeded')
+    })
+  })
+
+  describe('docker search', () => {
+    it('returns results for a known image', () => {
+      const result = parseCommand('docker search nginx', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('nginx')
+      expect(result.output).toContain('NAME')
+    })
+
+    it('returns no results for unknown search', () => {
+      const result = parseCommand('docker search zzz_nonexistent_zzz', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('No results found')
+    })
+
+    it('requires search term', () => {
+      const result = parseCommand('docker search', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('required')
+    })
+  })
+
+  describe('docker service', () => {
+    it('shows help with --help', () => {
+      const result = parseCommand('docker service --help', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Commands:')
+    })
+
+    it('shows help with no subcommand', () => {
+      const result = parseCommand('docker service', makeState(), noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Commands:')
+    })
+
+    it('creates a new service', () => {
+      const updateState = vi.fn()
+      const result = parseCommand('docker service create --name web --replicas 3 nginx:latest', makeState(), updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('Service web created')
+      expect(result.output).toContain('3 replica')
+      const services = updateState.mock.calls[0][0].services
+      expect(services.length).toBe(1)
+      expect(services[0].name).toBe('web')
+      expect(services[0].replicas).toBe(3)
+    })
+
+    it('rejects creating service without image', () => {
+      const result = parseCommand('docker service create --name web', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('image required')
+    })
+
+    it('rejects duplicate service name', () => {
+      const state = makeState({
+        services: [{
+          id: 'svc1', name: 'web', image: 'nginx:latest',
+          replicas: 1, desiredReplicas: 1, ports: [], created: Date.now(),
+        }],
+      })
+      const result = parseCommand('docker service create --name web nginx:latest', state, noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('already exists')
+    })
+
+    it('lists services', () => {
+      const state = makeState({
+        services: [{
+          id: 'svc123456789012345678901', name: 'web', image: 'nginx:latest',
+          replicas: 2, desiredReplicas: 3, ports: ['80:80'], created: Date.now(),
+        }],
+      })
+      const result = parseCommand('docker service ls', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('web')
+      expect(result.output).toContain('nginx:latest')
+    })
+
+    it('removes a service', () => {
+      const updateState = vi.fn()
+      const state = makeState({
+        services: [{
+          id: 'svc1', name: 'web', image: 'nginx:latest',
+          replicas: 1, desiredReplicas: 1, ports: [], created: Date.now(),
+        }],
+      })
+      const result = parseCommand('docker service rm web', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('removed')
+      expect(updateState.mock.calls[0][0].services.length).toBe(0)
+    })
+
+    it('rejects removing non-existent service', () => {
+      const result = parseCommand('docker service rm nonexistent', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('no such service')
+    })
+
+    it('scales a service', () => {
+      const updateState = vi.fn()
+      const state = makeState({
+        services: [{
+          id: 'svc1', name: 'web', image: 'nginx:latest',
+          replicas: 1, desiredReplicas: 1, ports: [], created: Date.now(),
+        }],
+      })
+      const result = parseCommand('docker service scale web=5', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('scaled to 5')
+      const updated = updateState.mock.calls[0][0].services[0]
+      expect(updated.replicas).toBe(5)
+      expect(updated.desiredReplicas).toBe(5)
+    })
+
+    it('rejects scale with invalid format', () => {
+      const result = parseCommand('docker service scale web', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Usage')
+    })
+
+    it('updates a service image', () => {
+      const updateState = vi.fn()
+      const state = makeState({
+        services: [{
+          id: 'svc1', name: 'web', image: 'nginx:1.0',
+          replicas: 1, desiredReplicas: 1, ports: [], created: Date.now(),
+        }],
+      })
+      const result = parseCommand('docker service update web --image nginx:2.0', state, updateState)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('nginx:1.0')
+      expect(result.output).toContain('nginx:2.0')
+      expect(updateState.mock.calls[0][0].services[0].image).toBe('nginx:2.0')
+    })
+
+    it('inspects a service', () => {
+      const state = makeState({
+        services: [{
+          id: 'svc1', name: 'web', image: 'nginx:latest',
+          replicas: 2, desiredReplicas: 2, ports: ['80:80'], created: Date.now(),
+        }],
+      })
+      const result = parseCommand('docker service inspect web', state, noopUpdate)
+      expect(result.success).toBe(true)
+      expect(result.output).toContain('"Name": "web"')
+      expect(result.output).toContain('"Image": "nginx:latest"')
+    })
+
+    it('rejects unknown subcommand', () => {
+      const result = parseCommand('docker service unknown', makeState(), noopUpdate)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('unknown subcommand')
     })
   })
 })
