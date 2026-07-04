@@ -1,5 +1,6 @@
 {
     "name": "docker-playground",
+    "description": "Learning more about Docker with the Docker API and a sandbox env.",
     "private": true,
     "version": "1.0.0",
     "type": "module",
