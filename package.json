@@ -1,5 +1,8 @@
 {
     "name": "docker-playground",
+    "engines": { "node": ">=24.13.0" },
+    "repository": { "type": "git", "url": "https://github.com/and3rn3t/docker-playground.git" },
+    "license": "MIT",
     "description": "Learning more about Docker with the Docker API and a sandbox env.",
     "private": true,
     "version": "1.0.0",
